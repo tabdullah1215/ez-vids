@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "ez-vids",
-    "slug": "ez-vids",
-    "version": "1.0.0",
+    "name": "EZVids",
+    "slug": "ezvids",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "ezvids",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
