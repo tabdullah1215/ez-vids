@@ -1,19 +1,23 @@
-import React from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Modal,
   View,
   Text,
+  Image,
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
+import { Audio } from 'expo-av';
 
 export interface PickerItem {
   id: string;
   label: string;
   sublabel?: string;
+  imageUrl?: string;
+  previewUrl?: string;
 }
 
 interface Props {
@@ -37,23 +41,66 @@ export function PickerModal({
   loading,
   error,
 }: Props) {
-  const handleSelect = (id: string) => {
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<PickerItem | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const listRef = useRef<FlatList<PickerItem>>(null);
+
+  const stopPlayback = useCallback(async () => {
+    if (soundRef.current) {
+      try { await soundRef.current.unloadAsync(); } catch {}
+      soundRef.current = null;
+    }
+    setPlayingId(null);
+  }, []);
+
+  const handlePlay = useCallback(async (item: PickerItem) => {
+    if (playingId === item.id) {
+      await stopPlayback();
+      return;
+    }
+    await stopPlayback();
+    if (!item.previewUrl) return;
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: item.previewUrl },
+        { shouldPlay: true },
+      );
+      soundRef.current = sound;
+      setPlayingId(item.id);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          stopPlayback();
+        }
+      });
+    } catch {
+      setPlayingId(null);
+    }
+  }, [playingId, stopPlayback]);
+
+  const handleClose = useCallback(() => {
+    stopPlayback();
+    onClose();
+  }, [onClose, stopPlayback]);
+
+  const handleSelect = useCallback((id: string) => {
+    stopPlayback();
     onSelect(id);
     onClose();
-  };
+  }, [onSelect, onClose, stopPlayback]);
 
   return (
     <Modal
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       {/* Backdrop */}
       <TouchableOpacity
         style={s.backdrop}
         activeOpacity={1}
-        onPress={onClose}
+        onPress={handleClose}
       />
 
       {/* Sheet */}
@@ -61,7 +108,7 @@ export function PickerModal({
         {/* Header */}
         <View style={s.header}>
           <Text style={s.title}>{title}</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={12}>
+          <TouchableOpacity onPress={handleClose} hitSlop={12}>
             <Text style={s.done}>Done</Text>
           </TouchableOpacity>
         </View>
@@ -75,16 +122,31 @@ export function PickerModal({
         ) : error ? (
           <View style={s.center}>
             <Text style={s.errorText}>{error}</Text>
-            <TouchableOpacity style={s.retryBtn} onPress={onClose}>
+            <TouchableOpacity style={s.retryBtn} onPress={handleClose}>
               <Text style={s.retryText}>Close</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <FlatList
+            ref={listRef}
             data={items}
             keyExtractor={(item) => item.id}
             contentContainerStyle={s.list}
             ItemSeparatorComponent={() => <View style={s.separator} />}
+            onLayout={() => {
+              if (!selectedId) return;
+              const idx = items.findIndex((i) => i.id === selectedId);
+              if (idx > 0) {
+                setTimeout(() => {
+                  listRef.current?.scrollToIndex({ index: idx, animated: false, viewPosition: 0.3 });
+                }, 100);
+              }
+            }}
+            onScrollToIndexFailed={(info) => {
+              setTimeout(() => {
+                listRef.current?.scrollToIndex({ index: info.index, animated: false, viewPosition: 0.3 });
+              }, 200);
+            }}
             renderItem={({ item }) => {
               const selected = item.id === selectedId;
               return (
@@ -93,21 +155,66 @@ export function PickerModal({
                   onPress={() => handleSelect(item.id)}
                   activeOpacity={0.7}
                 >
+                  {/* Selection indicator — left accent bar */}
+                  <View style={[s.accentBar, selected && s.accentBarActive]} />
+
+                  {/* Avatar thumbnail */}
+                  {item.imageUrl ? (
+                    <Image source={{ uri: item.imageUrl }} style={s.thumb} />
+                  ) : null}
+
                   <View style={s.rowText}>
                     <Text style={[s.rowLabel, selected && s.rowLabelSelected]}>
                       {item.label}
                     </Text>
                     {item.sublabel ? (
-                      <Text style={s.rowSublabel}>{item.sublabel}</Text>
+                      <Text style={[s.rowSublabel, selected && s.rowSublabelSelected]}>{item.sublabel}</Text>
                     ) : null}
                   </View>
-                  {selected && <Text style={s.check}>✓</Text>}
+
+                  {/* Audio preview button */}
+                  {item.previewUrl ? (
+                    <TouchableOpacity
+                      style={[s.actionBtn, selected && s.actionBtnSelected]}
+                      onPress={() => handlePlay(item)}
+                      hitSlop={8}
+                    >
+                      <Text style={s.playIcon}>
+                        {playingId === item.id ? '■' : '▶︎'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {/* Zoom preview button */}
+                  {item.imageUrl ? (
+                    <TouchableOpacity
+                      style={[s.actionBtn, selected && s.actionBtnSelected]}
+                      onPress={() => setPreviewItem(item)}
+                      hitSlop={8}
+                    >
+                      <Text style={s.zoomIcon}>⊕</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </TouchableOpacity>
               );
             }}
           />
         )}
       </SafeAreaView>
+
+      {/* Enlarged image preview */}
+      {previewItem?.imageUrl && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setPreviewItem(null)}>
+          <TouchableOpacity
+            style={s.previewBackdrop}
+            activeOpacity={1}
+            onPress={() => setPreviewItem(null)}
+          >
+            <Image source={{ uri: previewItem.imageUrl }} style={s.previewImage} resizeMode="contain" />
+            <Text style={s.previewCaption}>{previewItem.label}</Text>
+          </TouchableOpacity>
+        </Modal>
+      )}
     </Modal>
   );
 }
@@ -188,10 +295,28 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingRight: 20,
+    paddingLeft: 16,
     backgroundColor: BG,
   },
   rowSelected: {
+    backgroundColor: CARD,
+  },
+  accentBar: {
+    width: 3,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    marginRight: 12,
+    backgroundColor: 'transparent',
+  },
+  accentBarActive: {
+    backgroundColor: BRAND,
+  },
+  thumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
     backgroundColor: CARD,
   },
   rowText: {
@@ -210,10 +335,49 @@ const s = StyleSheet.create({
     color: '#555',
     marginTop: 2,
   },
-  check: {
-    fontSize: 16,
+  rowSublabelSelected: {
+    color: '#888',
+  },
+  actionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: CARD,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  actionBtnSelected: {
+    borderColor: BRAND,
+  },
+  playIcon: {
     color: BRAND,
-    fontWeight: '700',
-    marginLeft: 12,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  zoomIcon: {
+    color: BRAND,
+    fontSize: 20,
+  },
+  previewBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  previewImage: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 16,
+  },
+  previewCaption: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    textAlign: 'center',
   },
 });

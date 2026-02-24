@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TextInput,
+  Image,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
@@ -20,6 +21,7 @@ export default function GenerateScreen() {
   const [scriptText, setScriptText] = useState('');
   const [avatarId, setAvatarId] = useState('');
   const [avatarName, setAvatarName] = useState('');
+  const [avatarImageUrl, setAvatarImageUrl] = useState('');
   const [voiceId, setVoiceId] = useState('');
   const [voiceName, setVoiceName] = useState('');
   const [productImageUrl, setProductImageUrl] = useState('');
@@ -60,6 +62,7 @@ export default function GenerateScreen() {
         id: a.id,
         label: a.name,
         sublabel: a.gender ?? '',
+        imageUrl: a.previewUrl,
       })));
     } catch (err) {
       setAvatarsError(err instanceof Error ? err.message : 'Failed to load avatars');
@@ -79,6 +82,7 @@ export default function GenerateScreen() {
         id: v.id,
         label: v.name,
         sublabel: v.accentName ?? '',
+        previewUrl: v.previewUrl,
       })));
     } catch (err) {
       setVoicesError(err instanceof Error ? err.message : 'Failed to load voices');
@@ -155,6 +159,9 @@ export default function GenerateScreen() {
           <View style={s.field}>
             <Text style={s.label}>AVATAR</Text>
             <TouchableOpacity style={s.selector} onPress={openAvatarModal} activeOpacity={0.7}>
+              {avatarImageUrl ? (
+                <Image source={{ uri: avatarImageUrl }} style={s.selectorThumb} />
+              ) : null}
               <Text style={avatarId ? s.selectorValue : s.selectorPlaceholder} numberOfLines={1}>
                 {avatarName || 'Select avatar…'}
               </Text>
@@ -283,8 +290,10 @@ export default function GenerateScreen() {
       loading={avatarsLoading}
       error={avatarsError}
       onSelect={(id) => {
+        const a = avatars.find((a) => a.id === id);
         setAvatarId(id);
-        setAvatarName(avatars.find((a) => a.id === id)?.label ?? id);
+        setAvatarName(a?.label ?? id);
+        setAvatarImageUrl(a?.imageUrl ?? '');
       }}
       onClose={() => setAvatarModalOpen(false)}
     />
@@ -348,6 +357,10 @@ const s = StyleSheet.create({
     backgroundColor: CARD, borderRadius: 10, padding: 14,
     borderWidth: 1, borderColor: BORDER,
     flexDirection: 'row', alignItems: 'center',
+  },
+  selectorThumb: {
+    width: 32, height: 32, borderRadius: 16,
+    marginRight: 10, backgroundColor: '#262626',
   },
   selectorValue: { flex: 1, color: '#fff', fontSize: 15 },
   selectorPlaceholder: { flex: 1, color: '#444', fontSize: 15 },
