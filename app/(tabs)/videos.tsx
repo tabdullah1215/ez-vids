@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { api } from '@/src/api/client';
 import type { JobStatusAPIResponse } from '@/src/types/api';
 
@@ -24,8 +25,8 @@ const RED    = '#EF4444';
 const ACTIVE_STATUSES = new Set(['pending', 'submitted', 'queued', 'rendering', 'created']);
 const POLL_MS = 5_000;
 
-function formatElapsed(isoString: string): string {
-  const diffSec = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+function formatElapsed(isoString: string, now: number): string {
+  const diffSec = Math.floor((now - new Date(isoString).getTime()) / 1000);
   if (diffSec < 60) return `${diffSec}s ago`;
   const mins = Math.floor(diffSec / 60);
   const secs = diffSec % 60;
@@ -49,13 +50,18 @@ function JobCard({ job, now }: { job: JobStatusAPIResponse; now: number }) {
   const scriptPreview = job.request?.scriptText?.slice(0, 60) || '(no script)';
   const isActive = ACTIVE_STATUSES.has(job.status);
 
+  // For finished jobs, freeze the elapsed time at completion; for active jobs, use live clock
+  const elapsedEnd = isActive
+    ? now
+    : new Date(job.completedAt ?? job.updatedAt).getTime();
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <StatusIcon status={job.status} />
         <View style={styles.cardMeta}>
           <Text style={styles.statusText}>{job.status}</Text>
-          <Text style={styles.elapsed}>{formatElapsed(job.createdAt)}</Text>
+          <Text style={styles.elapsed}>{formatElapsed(job.createdAt, elapsedEnd)}</Text>
         </View>
       </View>
 
@@ -118,14 +124,25 @@ export default function VideosScreen() {
     };
   }, [jobs, fetchJobs]);
 
-  // Clock tick so elapsed times update every second
+  // Clock tick so elapsed times update every second (only while jobs are active)
   useEffect(() => {
-    clockRef.current = setInterval(() => setNow(Date.now()), 1000);
-    return () => { if (clockRef.current) clearInterval(clockRef.current); };
-  }, []);
+    const hasActive = jobs.some((j) => ACTIVE_STATUSES.has(j.status));
+    if (hasActive) {
+      clockRef.current = setInterval(() => setNow(Date.now()), 1000);
+    } else {
+      setNow(Date.now());          // one final update so timestamps are fresh
+      if (clockRef.current) { clearInterval(clockRef.current); clockRef.current = null; }
+    }
+    return () => { if (clockRef.current) { clearInterval(clockRef.current); clockRef.current = null; } };
+  }, [jobs]);
 
-  // Initial load
-  useEffect(() => { fetchJobs(); }, [fetchJobs]);
+  // Initial load + re-fetch whenever this tab gains focus
+  // (catches jobs submitted while on the Generate tab)
+  useFocusEffect(
+    useCallback(() => {
+      fetchJobs();
+    }, [fetchJobs])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -156,6 +173,7 @@ export default function VideosScreen() {
       <FlatList
         data={jobs}
         keyExtractor={(j) => j.jobId}
+        extraData={now}
         renderItem={({ item }) => <JobCard job={item} now={now} />}
         contentContainerStyle={jobs.length === 0 ? styles.emptyContainer : styles.listContent}
         refreshControl={
