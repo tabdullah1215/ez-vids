@@ -7,49 +7,23 @@ function getSupabase() {
 }
 
 /**
- * Attempt to acquire `requested` API call slots from the shared rate limit table.
- * Returns the number of slots actually granted (may be less than requested, or 0 if capped).
- *
- * Both submit-worker and poll-worker call this before touching Creatify,
- * so their combined calls never exceed max_calls per window_secs.
+ * Atomically acquire API call slots for a specific caller.
+ * Uses a Postgres function with SELECT ... FOR UPDATE — no TOCTOU race.
+ * Returns the number of slots granted (0 if rate-limited).
  */
-export async function acquireSlots(api: string, requested: number): Promise<number> {
+export async function acquireSlots(api: string, caller: string, requested: number): Promise<number> {
   const db = getSupabase();
-  const now = new Date();
 
-  const { data, error } = await db
-    .from('api_rate_limits')
-    .select('*')
-    .eq('api', api)
-    .single();
+  const { data, error } = await db.rpc('acquire_api_slots', {
+    p_api: api,
+    p_caller: caller,
+    p_requested: requested,
+  });
 
-  if (error || !data) {
-    console.error('[rateLimit] Failed to read rate limit row:', error?.message);
+  if (error) {
+    console.error('[rateLimit] RPC error:', error.message);
     return 0;
   }
 
-  const windowStart = new Date(data.window_start);
-  const windowExpired =
-    (now.getTime() - windowStart.getTime()) / 1000 > data.window_secs;
-
-  if (windowExpired) {
-    // Reset window — grant up to requested (new window starts now)
-    const granted = Math.min(requested, data.max_calls);
-    await db.from('api_rate_limits').update({
-      window_start: now.toISOString(),
-      calls_made: granted,
-    }).eq('api', api);
-    return granted;
-  }
-
-  const remaining = data.max_calls - data.calls_made;
-  const granted = Math.min(remaining, requested);
-
-  if (granted > 0) {
-    await db.from('api_rate_limits').update({
-      calls_made: data.calls_made + granted,
-    }).eq('api', api);
-  }
-
-  return granted;
+  return data ?? 0;
 }

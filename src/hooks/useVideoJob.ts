@@ -18,7 +18,12 @@ interface JobState {
   elapsedSeconds: number;
 }
 
-const POLL_INTERVAL_MS = 5_000;
+/** Adaptive backoff: 15s for first 3 min, 30s for 3-10 min, 60s after 10 min */
+function getInterval(elapsedMs: number): number {
+  if (elapsedMs < 3 * 60_000) return 15_000;
+  if (elapsedMs < 10 * 60_000) return 30_000;
+  return 60_000;
+}
 
 export function useVideoJob() {
   const [state, setState] = useState<JobState>({
@@ -30,12 +35,12 @@ export function useVideoJob() {
     elapsedSeconds: 0,
   });
 
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startRef = useRef(0);
 
   const cleanup = useCallback(() => {
-    if (pollRef.current) clearInterval(pollRef.current);
+    if (pollRef.current) clearTimeout(pollRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
     pollRef.current = null;
     timerRef.current = null;
@@ -63,38 +68,78 @@ export function useVideoJob() {
         setState((s) => ({ ...s, elapsedSeconds: elapsed }));
       }, 1000);
 
-      // Poll function
-      const poll = async () => {
-        try {
-          const result = await api.getJobStatus(jobId);
+      // Recursive poll with adaptive backoff
+      const schedulePoll = () => {
+        const elapsedMs = Date.now() - startRef.current;
+        const interval = getInterval(elapsedMs);
 
-          setState((s) => ({
-            ...s,
-            providerStatus: result.status,
-            videoUrl: result.videoUrl || null,
-            error: result.errorMessage || null,
-          }));
+        pollRef.current = setTimeout(async () => {
+          try {
+            const result = await api.getJobStatus(jobId);
 
-          if (result.status === 'completed') {
-            cleanup();
-            setState((s) => ({ ...s, phase: 'completed' }));
-          } else if (result.status === 'failed') {
-            cleanup();
             setState((s) => ({
               ...s,
-              phase: 'failed',
-              error: result.errorMessage || 'Video generation failed',
+              providerStatus: result.status,
+              videoUrl: result.videoUrl || null,
+              error: result.errorMessage || null,
             }));
+
+            if (result.status === 'completed') {
+              cleanup();
+              setState((s) => ({ ...s, phase: 'completed' }));
+              return;
+            } else if (result.status === 'failed') {
+              cleanup();
+              setState((s) => ({
+                ...s,
+                phase: 'failed',
+                error: result.errorMessage || 'Video generation failed',
+              }));
+              return;
+            }
+          } catch (err) {
+            // Transient errors — keep polling, don't crash
+            console.warn('[useVideoJob] poll error:', err);
           }
-        } catch (err) {
-          // Transient errors — keep polling, don't crash
-          console.warn('[useVideoJob] poll error:', err);
-        }
+
+          // Schedule next poll with recalculated interval
+          schedulePoll();
+        }, interval);
       };
 
-      // First check after 3s, then every 5s
-      setTimeout(poll, 3000);
-      pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
+      // First poll at 10s (submit-worker hasn't run yet at 3s)
+      pollRef.current = setTimeout(() => {
+        (async () => {
+          try {
+            const result = await api.getJobStatus(jobId);
+
+            setState((s) => ({
+              ...s,
+              providerStatus: result.status,
+              videoUrl: result.videoUrl || null,
+              error: result.errorMessage || null,
+            }));
+
+            if (result.status === 'completed') {
+              cleanup();
+              setState((s) => ({ ...s, phase: 'completed' }));
+              return;
+            } else if (result.status === 'failed') {
+              cleanup();
+              setState((s) => ({
+                ...s,
+                phase: 'failed',
+                error: result.errorMessage || 'Video generation failed',
+              }));
+              return;
+            }
+          } catch (err) {
+            console.warn('[useVideoJob] poll error:', err);
+          }
+
+          schedulePoll();
+        })();
+      }, 10_000);
     },
     [cleanup]
   );

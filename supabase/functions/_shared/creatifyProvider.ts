@@ -1,6 +1,14 @@
 import type { VideoProvider } from './videoProvider.ts';
 import type { VideoRequest, JobStatus } from './types/video.ts';
 
+/** Thrown when Creatify returns HTTP 429 — workers should stop the batch early. */
+export class RateLimitedError extends Error {
+  constructor(endpoint: string) {
+    super(`Creatify rate limited on ${endpoint}`);
+    this.name = 'RateLimitedError';
+  }
+}
+
 const CREATIFY_BASE =
   Deno.env.get('CREATIFY_BASE_URL') || 'https://api.creatify.ai';
 
@@ -76,6 +84,7 @@ export const creatifyProvider: VideoProvider = {
       body: JSON.stringify(payload),
     });
 
+    if (res.status === 429) throw new RateLimitedError('createJob');
     if (!res.ok) {
       const err = await res.text();
       throw new Error(`Creatify createJob ${res.status}: ${err}`);
@@ -94,6 +103,7 @@ export const creatifyProvider: VideoProvider = {
       { method: 'GET', headers: headers() }
     );
 
+    if (res.status === 429) throw new RateLimitedError('checkJobStatus');
     if (!res.ok) {
       const err = await res.text();
       throw new Error(`Creatify checkStatus ${res.status}: ${err}`);
@@ -115,6 +125,7 @@ export const creatifyProvider: VideoProvider = {
       method: 'GET',
       headers: headers(),
     });
+    if (res.status === 429) throw new RateLimitedError('listAvatars');
     if (!res.ok) throw new Error(`listAvatars ${res.status}`);
 
     const data = await res.json();
@@ -132,6 +143,7 @@ export const creatifyProvider: VideoProvider = {
       method: 'GET',
       headers: headers(),
     });
+    if (res.status === 429) throw new RateLimitedError('listVoices');
     if (!res.ok) throw new Error(`listVoices ${res.status}`);
 
     const data = await res.json();

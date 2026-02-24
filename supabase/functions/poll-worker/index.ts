@@ -1,9 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
-import { creatifyProvider } from '../_shared/creatifyProvider.ts';
+import { creatifyProvider, RateLimitedError } from '../_shared/creatifyProvider.ts';
 import { acquireSlots } from '../_shared/rateLimit.ts';
 
-const BATCH_SIZE = 10; // max jobs to poll per run
+const BATCH_SIZE = 25; // max jobs to poll per run
 const ACTIVE_STATUSES = ['submitted', 'queued', 'rendering'];
 
 function getSupabase() {
@@ -37,7 +37,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Now acquire only as many slots as we actually need
-    const slots = await acquireSlots('creatify', candidates.length);
+    const slots = await acquireSlots('creatify', 'poll-worker', candidates.length);
 
     if (slots === 0) {
       console.log('[poll-worker] Rate limit reached — skipping run');
@@ -76,6 +76,10 @@ Deno.serve(async (req: Request) => {
         await db.from('video_jobs').update(updates).eq('id', job.id);
         polled++;
       } catch (err) {
+        if (err instanceof RateLimitedError) {
+          console.warn(`[poll-worker] Creatify 429 — stopping batch early after ${polled} polls`);
+          break;
+        }
         console.error(`[poll-worker] Failed to check job ${job.id}:`, err);
         // Don't mark as failed — transient error, retry next run
       }

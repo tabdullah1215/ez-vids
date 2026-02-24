@@ -23,17 +23,21 @@ const GREEN  = '#22C55E';
 const RED    = '#EF4444';
 
 const ACTIVE_STATUSES = new Set(['pending', 'submitted', 'queued', 'rendering', 'created']);
-const POLL_MS = 5_000;
+const POLL_MS = 15_000;
 
 function formatElapsed(isoString: string, now: number): string {
   const diffSec = Math.floor((now - new Date(isoString).getTime()) / 1000);
   if (diffSec < 60) return `${diffSec}s ago`;
   const mins = Math.floor(diffSec / 60);
-  const secs = diffSec % 60;
-  if (mins < 60) return `${mins}m ${secs}s ago`;
+  if (mins < 60) return `${mins}m ${diffSec % 60}s ago`;
   const hrs = Math.floor(mins / 60);
-  const remMins = mins % 60;
-  return `${hrs}h ${remMins}m ago`;
+  if (hrs < 24) return `${hrs}h ${mins % 60}m ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
 }
 
 function StatusIcon({ status }: { status: string }) {
@@ -50,10 +54,11 @@ function JobCard({ job, now }: { job: JobStatusAPIResponse; now: number }) {
   const scriptPreview = job.request?.scriptText?.slice(0, 60) || '(no script)';
   const isActive = ACTIVE_STATUSES.has(job.status);
 
-  // For finished jobs, freeze the elapsed time at completion; for active jobs, use live clock
-  const elapsedEnd = isActive
-    ? now
-    : new Date(job.completedAt ?? job.updatedAt).getTime();
+  // Active jobs: show time since creation (processing duration)
+  // Finished jobs: show time since completion/update (how long ago it finished)
+  const referenceTime = isActive
+    ? job.createdAt
+    : (job.completedAt ?? job.updatedAt);
 
   return (
     <View style={styles.card}>
@@ -61,7 +66,7 @@ function JobCard({ job, now }: { job: JobStatusAPIResponse; now: number }) {
         <StatusIcon status={job.status} />
         <View style={styles.cardMeta}>
           <Text style={styles.statusText}>{job.status}</Text>
-          <Text style={styles.elapsed}>{formatElapsed(job.createdAt, elapsedEnd)}</Text>
+          <Text style={styles.elapsed}>{formatElapsed(referenceTime, now)}</Text>
         </View>
       </View>
 
@@ -124,15 +129,11 @@ export default function VideosScreen() {
     };
   }, [jobs, fetchJobs]);
 
-  // Clock tick so elapsed times update every second (only while jobs are active)
+  // Clock tick: 1s when active jobs (live timer), 30s when idle (keep "ago" fresh)
   useEffect(() => {
     const hasActive = jobs.some((j) => ACTIVE_STATUSES.has(j.status));
-    if (hasActive) {
-      clockRef.current = setInterval(() => setNow(Date.now()), 1000);
-    } else {
-      setNow(Date.now());          // one final update so timestamps are fresh
-      if (clockRef.current) { clearInterval(clockRef.current); clockRef.current = null; }
-    }
+    const interval = hasActive ? 1000 : 30_000;
+    clockRef.current = setInterval(() => setNow(Date.now()), interval);
     return () => { if (clockRef.current) { clearInterval(clockRef.current); clockRef.current = null; } };
   }, [jobs]);
 
