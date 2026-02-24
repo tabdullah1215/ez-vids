@@ -134,18 +134,21 @@ export function PickerModal({
             contentContainerStyle={s.list}
             ItemSeparatorComponent={() => <View style={s.separator} />}
             onLayout={() => {
-              if (!selectedId) return;
+              if (!selectedId || !items.length) return;
               const idx = items.findIndex((i) => i.id === selectedId);
               if (idx > 0) {
+                // Small delay lets FlatList finish its initial render pass
                 setTimeout(() => {
                   listRef.current?.scrollToIndex({ index: idx, animated: false, viewPosition: 0.3 });
-                }, 100);
+                }, 300);
               }
             }}
-            onScrollToIndexFailed={(info) => {
+            onScrollToIndexFailed={({ index, averageItemLength }) => {
+              // Fallback: use average item length to estimate offset, then retry
+              listRef.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
               setTimeout(() => {
-                listRef.current?.scrollToIndex({ index: info.index, animated: false, viewPosition: 0.3 });
-              }, 200);
+                listRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 });
+              }, 500);
             }}
             renderItem={({ item }) => {
               const selected = item.id === selectedId;
