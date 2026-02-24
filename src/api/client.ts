@@ -67,6 +67,11 @@ class EZVidsApiClient {
     return this.invoke<VoiceListResponse>('list-voices');
   }
 
+  /** List all jobs for the current user */
+  getJobs() {
+    return this.invoke<{ jobs: JobStatusAPIResponse[] }>('list-jobs');
+  }
+
   /** Health check — verify Edge Functions are reachable */
   health() {
     return this.invoke<{ service: string; status: string }>('health');

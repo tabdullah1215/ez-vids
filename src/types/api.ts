@@ -27,6 +27,7 @@ export interface JobStatusAPIResponse {
   thumbnailUrl?: string;
   creditsUsed?: number;
   errorMessage?: string;
+  request?: { scriptText?: string };
   createdAt: string;
   updatedAt: string;
   completedAt?: string;

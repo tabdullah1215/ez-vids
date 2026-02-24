@@ -3,6 +3,7 @@ export type VoiceMode = 'user_audio' | 'tts';
 
 /** Job lifecycle states */
 export type JobStatus =
+  | 'pending'
   | 'created'
   | 'submitted'
   | 'queued'

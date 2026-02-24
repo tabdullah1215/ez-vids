@@ -19,7 +19,6 @@ interface JobState {
 }
 
 const POLL_INTERVAL_MS = 5_000;
-const MAX_POLL_DURATION_MS = 5 * 60 * 1_000; // 5 min timeout
 
 export function useVideoJob() {
   const [state, setState] = useState<JobState>({
@@ -62,16 +61,6 @@ export function useVideoJob() {
       timerRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startRef.current) / 1000);
         setState((s) => ({ ...s, elapsedSeconds: elapsed }));
-
-        // Safety timeout
-        if (Date.now() - startRef.current > MAX_POLL_DURATION_MS) {
-          cleanup();
-          setState((s) => ({
-            ...s,
-            phase: 'failed',
-            error: 'Generation timed out after 5 minutes. Try again.',
-          }));
-        }
       }, 1000);
 
       // Poll function

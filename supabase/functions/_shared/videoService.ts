@@ -1,32 +1,31 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import type { VideoProvider } from './videoProvider.ts';
 import type { VideoRequest, VideoJob } from './types/video.ts';
 
 function getSupabase() {
   const url = Deno.env.get('SUPABASE_URL');
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!url || !key) {
-    throw new Error(
-      'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars.'
-    );
+    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars.');
   }
   return createClient(url, key);
 }
 
 export class VideoService {
-  constructor(private provider: VideoProvider) {}
-
+  /**
+   * Insert a new job as 'pending' — no Creatify call.
+   * The submit-worker cron picks it up and submits to Creatify.
+   */
   async createJob(userId: string, request: VideoRequest): Promise<VideoJob> {
     const db = getSupabase();
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
     const job: VideoJob = {
-      id, userId, status: 'created', request,
+      id, userId, status: 'pending', request,
       createdAt: now, updatedAt: now,
     };
 
-    const { error: insErr } = await db.from('video_jobs').insert({
+    const { error } = await db.from('video_jobs').insert({
       id: job.id,
       user_id: job.userId,
       status: job.status,
@@ -34,29 +33,16 @@ export class VideoService {
       created_at: job.createdAt,
       updated_at: job.updatedAt,
     });
-    if (insErr) throw new Error(`DB insert: ${insErr.message}`);
 
-    try {
-      const result = await this.provider.createJob(request);
+    if (error) throw new Error(`DB insert: ${error.message}`);
 
-      const { error: updErr } = await db.from('video_jobs').update({
-        provider_job_id: result.providerJobId,
-        status: result.status,
-        updated_at: new Date().toISOString(),
-      }).eq('id', id);
-      if (updErr) throw new Error(`DB update: ${updErr.message}`);
-
-      return { ...job, providerJobId: result.providerJobId, status: result.status };
-    } catch (err) {
-      await db.from('video_jobs').update({
-        status: 'failed',
-        error_message: err instanceof Error ? err.message : 'Unknown error',
-        updated_at: new Date().toISOString(),
-      }).eq('id', id);
-      throw err;
-    }
+    return job;
   }
 
+  /**
+   * Read job status from DB only — no Creatify call.
+   * The poll-worker cron handles Creatify status checks and updates the DB.
+   */
   async refreshJobStatus(jobId: string): Promise<VideoJob | null> {
     const db = getSupabase();
 
@@ -64,27 +50,8 @@ export class VideoService {
       .from('video_jobs').select('*').eq('id', jobId).single();
 
     if (error || !row) return null;
-    if (row.status === 'completed' || row.status === 'failed') {
-      return this.toJob(row);
-    }
-    if (!row.provider_job_id) return this.toJob(row);
 
-    const result = await this.provider.checkJobStatus(row.provider_job_id);
-
-    const updates: Record<string, unknown> = {
-      status: result.status,
-      updated_at: new Date().toISOString(),
-    };
-    if (result.videoUrl) updates.video_url = result.videoUrl;
-    if (result.thumbnailUrl) updates.thumbnail_url = result.thumbnailUrl;
-    if (result.creditsUsed) updates.credits_used = result.creditsUsed;
-    if (result.errorMessage) updates.error_message = result.errorMessage;
-    if (result.status === 'completed') {
-      updates.completed_at = new Date().toISOString();
-    }
-
-    await db.from('video_jobs').update(updates).eq('id', jobId);
-    return this.toJob({ ...row, ...updates });
+    return this.toJob(row);
   }
 
   private toJob(r: Record<string, unknown>): VideoJob {
@@ -104,3 +71,5 @@ export class VideoService {
     };
   }
 }
+
+export const videoService = new VideoService();
