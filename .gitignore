@@ -33,10 +33,8 @@ yarn-error.*
 # local env files
 .env*.local
 .env
-packages/api/.env.local
-
-# Vercel
-.vercel
+supabase/functions/.env
+supabase/.env.local
 
 # typescript
 *.tsbuildinfo

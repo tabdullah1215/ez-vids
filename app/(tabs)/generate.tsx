@@ -87,13 +87,13 @@ export default function GenerateScreen() {
 
           {/* Script */}
           <View style={s.field}>
-            <Text style={s.label}>Script (what the avatar says)</Text>
+            <Text style={s.label}>SCRIPT</Text>
             <TextInput
               style={s.textArea}
               multiline
               numberOfLines={4}
               placeholder={EZVIDS_DEFAULTS.scriptText}
-              placeholderTextColor="#555"
+              placeholderTextColor="#333"
               value={scriptText}
               onChangeText={setScriptText}
             />
@@ -101,11 +101,11 @@ export default function GenerateScreen() {
 
           {/* Avatar ID */}
           <View style={s.field}>
-            <Text style={s.label}>Avatar ID</Text>
+            <Text style={s.label}>AVATAR ID (optional)</Text>
             <TextInput
               style={s.input}
-              placeholder={`Default: ${EZVIDS_DEFAULTS.avatarId.slice(0, 16)}...`}
-              placeholderTextColor="#555"
+              placeholder={EZVIDS_DEFAULTS.avatarId}
+              placeholderTextColor="#333"
               value={avatarId}
               onChangeText={setAvatarId}
               autoCapitalize="none"
@@ -115,11 +115,11 @@ export default function GenerateScreen() {
 
           {/* Voice ID */}
           <View style={s.field}>
-            <Text style={s.label}>Voice ID (TTS accent)</Text>
+            <Text style={s.label}>VOICE ID (optional)</Text>
             <TextInput
               style={s.input}
-              placeholder={`Default: ${EZVIDS_DEFAULTS.voiceId.slice(0, 16)}...`}
-              placeholderTextColor="#555"
+              placeholder={EZVIDS_DEFAULTS.voiceId}
+              placeholderTextColor="#333"
               value={voiceId}
               onChangeText={setVoiceId}
               autoCapitalize="none"
@@ -129,11 +129,11 @@ export default function GenerateScreen() {
 
           {/* Product Image */}
           <View style={s.field}>
-            <Text style={s.label}>Product Image URL</Text>
+            <Text style={s.label}>PRODUCT IMAGE URL (optional)</Text>
             <TextInput
               style={s.input}
-              placeholder="https://... (optional background)"
-              placeholderTextColor="#555"
+              placeholder="https://..."
+              placeholderTextColor="#333"
               value={productImageUrl}
               onChangeText={setProductImageUrl}
               autoCapitalize="none"
@@ -148,16 +148,16 @@ export default function GenerateScreen() {
             onPress={handleGenerate}
             activeOpacity={0.8}
           >
-            <Text style={s.generateBtnText}>⚡ Generate Video</Text>
+            <Text style={s.generateBtnText}>Generate Video</Text>
           </TouchableOpacity>
 
           {/* Defaults Info */}
           <View style={s.infoBox}>
             <Text style={s.infoTitle}>MVP Defaults</Text>
-            <Text style={s.infoLine}>Aspect ratio: 9:16 (TikTok)</Text>
-            <Text style={s.infoLine}>Captions: auto-generated</Text>
-            <Text style={s.infoLine}>Voice mode: Text-to-Speech</Text>
-            <Text style={s.infoLine}>Cost: ~5 Creatify credits / 30s</Text>
+            <Text style={s.infoLine}>Mode: TTS (text-to-speech)</Text>
+            <Text style={s.infoLine}>Aspect: 9:16 (vertical)</Text>
+            <Text style={s.infoLine}>Captions: ON</Text>
+            <Text style={s.infoLine}>Backend: Supabase Edge Functions → Creatify API</Text>
           </View>
         </>
       )}

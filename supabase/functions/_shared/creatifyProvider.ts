@@ -1,16 +1,16 @@
-import type { VideoProvider } from './videoProvider';
-import type { VideoRequest, JobStatus } from './types/video';
+import type { VideoProvider } from './videoProvider.ts';
+import type { VideoRequest, JobStatus } from './types/video.ts';
 
 const CREATIFY_BASE =
-  process.env.CREATIFY_BASE_URL || 'https://api.creatify.ai';
+  Deno.env.get('CREATIFY_BASE_URL') || 'https://api.creatify.ai';
 
 function headers(): Record<string, string> {
-  const id = process.env.CREATIFY_API_ID;
-  const key = process.env.CREATIFY_API_KEY;
+  const id = Deno.env.get('CREATIFY_API_ID');
+  const key = Deno.env.get('CREATIFY_API_KEY');
   if (!id || !key) {
     throw new Error(
       'Missing CREATIFY_API_ID or CREATIFY_API_KEY env vars. ' +
-      'Set them in Vercel dashboard or .env.local'
+      'Set them in supabase/functions/.env or Supabase dashboard secrets.'
     );
   }
   return {

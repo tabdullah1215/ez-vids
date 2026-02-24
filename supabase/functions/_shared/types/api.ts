@@ -1,6 +1,6 @@
-import type { VoiceMode, JobStatus } from './video';
+import type { VoiceMode, JobStatus } from './video.ts';
 
-/** POST /api/videos/generate — client sends this */
+/** POST /functions/v1/generate-video — client sends this */
 export interface GenerateVideoAPIRequest {
   scriptText?: string;
   audioUrl?: string;
@@ -13,13 +13,13 @@ export interface GenerateVideoAPIRequest {
   captionsEnabled?: boolean;
 }
 
-/** POST /api/videos/generate — server returns this */
+/** POST /functions/v1/generate-video — server returns this */
 export interface GenerateVideoAPIResponse {
   jobId: string;
   status: JobStatus;
 }
 
-/** GET /api/videos/:jobId — server returns this */
+/** GET /functions/v1/job-status?jobId=... — server returns this */
 export interface JobStatusAPIResponse {
   jobId: string;
   status: JobStatus;
@@ -32,7 +32,7 @@ export interface JobStatusAPIResponse {
   completedAt?: string;
 }
 
-/** GET /api/avatars — server returns this */
+/** GET /functions/v1/list-avatars — server returns this */
 export interface AvatarListResponse {
   avatars: Array<{
     id: string;
@@ -42,7 +42,7 @@ export interface AvatarListResponse {
   }>;
 }
 
-/** GET /api/voices — server returns this */
+/** GET /functions/v1/list-voices — server returns this */
 export interface VoiceListResponse {
   voices: Array<{
     id: string;

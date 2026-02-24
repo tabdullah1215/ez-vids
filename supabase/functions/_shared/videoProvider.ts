@@ -1,4 +1,4 @@
-import type { VideoRequest, JobStatus } from './types/video';
+import type { VideoRequest, JobStatus } from './types/video.ts';
 
 /**
  * Abstract video generation provider interface.

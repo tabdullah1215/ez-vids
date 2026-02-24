@@ -1,4 +1,4 @@
-import type { VoiceMode } from './types/video';
+import type { VoiceMode } from './types/video.ts';
 
 /**
  * MVP hardcoded defaults.

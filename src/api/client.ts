@@ -6,15 +6,14 @@ import type {
   VoiceListResponse,
 } from '../types/api';
 
-const API_BASE =
-  process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const FUNCTIONS_BASE = `${SUPABASE_URL}/functions/v1`;
 
 class EZVidsApiClient {
-  private baseUrl: string;
   private userId: string;
 
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
+  constructor() {
     // MVP: hardcoded user. Replace with Supabase Auth session token.
     this.userId = 'mvp-test-user';
   }
@@ -24,23 +23,25 @@ class EZVidsApiClient {
     this.userId = id;
   }
 
-  private async request<T>(path: string, opts?: RequestInit): Promise<T> {
-    const url = `${this.baseUrl}${path}`;
+  private async invoke<T>(functionName: string, body?: unknown): Promise<T> {
+    const url = `${FUNCTIONS_BASE}/${functionName}`;
 
-    console.log(`[EZVids API] ${opts?.method || 'GET'} ${url}`);
+    console.log(`[EZVids API] POST ${url}`);
 
     const res = await fetch(url, {
-      ...opts,
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY,
         'x-user-id': this.userId,
-        ...opts?.headers,
       },
+      body: JSON.stringify(body ?? {}),
     });
 
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`API ${res.status}: ${body}`);
+      const text = await res.text();
+      throw new Error(`API ${res.status}: ${text}`);
     }
 
     return res.json();
@@ -48,31 +49,28 @@ class EZVidsApiClient {
 
   /** Submit a video generation request */
   generateVideo(input: GenerateVideoAPIRequest) {
-    return this.request<GenerateVideoAPIResponse>('/videos/generate', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
+    return this.invoke<GenerateVideoAPIResponse>('generate-video', input);
   }
 
   /** Poll job status */
   getJobStatus(jobId: string) {
-    return this.request<JobStatusAPIResponse>(`/videos/${jobId}`);
+    return this.invoke<JobStatusAPIResponse>('job-status', { jobId });
   }
 
   /** List available avatars (cached server-side) */
   getAvatars() {
-    return this.request<AvatarListResponse>('/avatars');
+    return this.invoke<AvatarListResponse>('list-avatars');
   }
 
   /** List available TTS voices (cached server-side) */
   getVoices() {
-    return this.request<VoiceListResponse>('/voices');
+    return this.invoke<VoiceListResponse>('list-voices');
   }
 
-  /** Health check — verify API is reachable */
+  /** Health check — verify Edge Functions are reachable */
   health() {
-    return this.request<{ service: string; status: string }>('/health');
+    return this.invoke<{ service: string; status: string }>('health');
   }
 }
 
-export const api = new EZVidsApiClient(API_BASE);
+export const api = new EZVidsApiClient();

@@ -1,15 +1,13 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { v4 as uuid } from 'uuid';
-import type { VideoProvider } from './videoProvider';
-import type { VideoRequest, VideoJob } from './types/video';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { VideoProvider } from './videoProvider.ts';
+import type { VideoRequest, VideoJob } from './types/video.ts';
 
-function getSupabase(): SupabaseClient {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+function getSupabase() {
+  const url = Deno.env.get('SUPABASE_URL');
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!url || !key) {
     throw new Error(
-      'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars. ' +
-      'Set them in Vercel dashboard or .env.local'
+      'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars.'
     );
   }
   return createClient(url, key);
@@ -20,10 +18,9 @@ export class VideoService {
 
   async createJob(userId: string, request: VideoRequest): Promise<VideoJob> {
     const db = getSupabase();
-    const id = uuid();
+    const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    // 1. Insert initial record
     const job: VideoJob = {
       id, userId, status: 'created', request,
       createdAt: now, updatedAt: now,
@@ -39,7 +36,6 @@ export class VideoService {
     });
     if (insErr) throw new Error(`DB insert: ${insErr.message}`);
 
-    // 2. Submit to provider
     try {
       const result = await this.provider.createJob(request);
 
@@ -73,7 +69,6 @@ export class VideoService {
     }
     if (!row.provider_job_id) return this.toJob(row);
 
-    // Poll provider
     const result = await this.provider.checkJobStatus(row.provider_job_id);
 
     const updates: Record<string, unknown> = {
