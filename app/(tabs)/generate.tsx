@@ -13,13 +13,26 @@ import {
 import { useVideoJob } from '@/src/hooks/useVideoJob';
 import { EZVIDS_DEFAULTS } from '@/src/config/defaults';
 import { api } from '@/src/api/client';
+import { PickerModal, type PickerItem } from '@/src/components/PickerModal';
 
 export default function GenerateScreen() {
-  // --- Form state (all optional — defaults used when empty) ---
+  // --- Form state ---
   const [scriptText, setScriptText] = useState('');
   const [avatarId, setAvatarId] = useState('');
+  const [avatarName, setAvatarName] = useState('');
   const [voiceId, setVoiceId] = useState('');
+  const [voiceName, setVoiceName] = useState('');
   const [productImageUrl, setProductImageUrl] = useState('');
+
+  // --- Picker modal state ---
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  const [avatars, setAvatars] = useState<PickerItem[]>([]);
+  const [voices, setVoices] = useState<PickerItem[]>([]);
+  const [avatarsLoading, setAvatarsLoading] = useState(false);
+  const [voicesLoading, setVoicesLoading] = useState(false);
+  const [avatarsError, setAvatarsError] = useState<string | null>(null);
+  const [voicesError, setVoicesError] = useState<string | null>(null);
 
   // --- Connection test state ---
   const [apiOk, setApiOk] = useState<boolean | null>(null);
@@ -33,6 +46,44 @@ export default function GenerateScreen() {
       setApiOk(result.status === 'ok');
     } catch {
       setApiOk(false);
+    }
+  };
+
+  const openAvatarModal = async () => {
+    setAvatarModalOpen(true);
+    if (avatars.length > 0) return; // already cached
+    setAvatarsLoading(true);
+    setAvatarsError(null);
+    try {
+      const res = await api.getAvatars();
+      setAvatars(res.avatars.map((a) => ({
+        id: a.id,
+        label: a.name,
+        sublabel: a.gender ?? '',
+      })));
+    } catch (err) {
+      setAvatarsError(err instanceof Error ? err.message : 'Failed to load avatars');
+    } finally {
+      setAvatarsLoading(false);
+    }
+  };
+
+  const openVoiceModal = async () => {
+    setVoiceModalOpen(true);
+    if (voices.length > 0) return; // already cached
+    setVoicesLoading(true);
+    setVoicesError(null);
+    try {
+      const res = await api.getVoices();
+      setVoices(res.voices.map((v) => ({
+        id: v.id,
+        label: v.name,
+        sublabel: v.accentName ?? '',
+      })));
+    } catch (err) {
+      setVoicesError(err instanceof Error ? err.message : 'Failed to load voices');
+    } finally {
+      setVoicesLoading(false);
     }
   };
 
@@ -61,6 +112,7 @@ export default function GenerateScreen() {
   const showError = job.phase === 'failed';
 
   return (
+    <>
     <ScrollView style={s.container} contentContainerStyle={s.content}>
 
       {/* ========== HEADER ========== */}
@@ -99,32 +151,26 @@ export default function GenerateScreen() {
             />
           </View>
 
-          {/* Avatar ID */}
+          {/* Avatar Picker */}
           <View style={s.field}>
-            <Text style={s.label}>AVATAR ID (optional)</Text>
-            <TextInput
-              style={s.input}
-              placeholder={EZVIDS_DEFAULTS.avatarId}
-              placeholderTextColor="#333"
-              value={avatarId}
-              onChangeText={setAvatarId}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <Text style={s.label}>AVATAR</Text>
+            <TouchableOpacity style={s.selector} onPress={openAvatarModal} activeOpacity={0.7}>
+              <Text style={avatarId ? s.selectorValue : s.selectorPlaceholder} numberOfLines={1}>
+                {avatarName || 'Select avatar…'}
+              </Text>
+              <Text style={s.chevron}>›</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Voice ID */}
+          {/* Voice Picker */}
           <View style={s.field}>
-            <Text style={s.label}>VOICE ID (optional)</Text>
-            <TextInput
-              style={s.input}
-              placeholder={EZVIDS_DEFAULTS.voiceId}
-              placeholderTextColor="#333"
-              value={voiceId}
-              onChangeText={setVoiceId}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <Text style={s.label}>VOICE</Text>
+            <TouchableOpacity style={s.selector} onPress={openVoiceModal} activeOpacity={0.7}>
+              <Text style={voiceId ? s.selectorValue : s.selectorPlaceholder} numberOfLines={1}>
+                {voiceName || 'Select voice…'}
+              </Text>
+              <Text style={s.chevron}>›</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Product Image */}
@@ -227,6 +273,37 @@ export default function GenerateScreen() {
         </View>
       )}
     </ScrollView>
+
+    {/* ========== MODALS ========== */}
+    <PickerModal
+      visible={avatarModalOpen}
+      title="Select Avatar"
+      items={avatars}
+      selectedId={avatarId || null}
+      loading={avatarsLoading}
+      error={avatarsError}
+      onSelect={(id) => {
+        setAvatarId(id);
+        setAvatarName(avatars.find((a) => a.id === id)?.label ?? id);
+      }}
+      onClose={() => setAvatarModalOpen(false)}
+    />
+
+    <PickerModal
+      visible={voiceModalOpen}
+      title="Select Voice"
+      items={voices}
+      selectedId={voiceId || null}
+      loading={voicesLoading}
+      error={voicesError}
+      onSelect={(id) => {
+        setVoiceId(id);
+        const v = voices.find((v) => v.id === id);
+        setVoiceName(v ? `${v.label}${v.sublabel ? ` · ${v.sublabel}` : ''}` : id);
+      }}
+      onClose={() => setVoiceModalOpen(false)}
+    />
+    </>
   );
 }
 
@@ -267,6 +344,14 @@ const s = StyleSheet.create({
   // Form
   field: { marginBottom: 14 },
   label: { color: '#999', fontSize: 13, fontWeight: '600', marginBottom: 5 },
+  selector: {
+    backgroundColor: CARD, borderRadius: 10, padding: 14,
+    borderWidth: 1, borderColor: BORDER,
+    flexDirection: 'row', alignItems: 'center',
+  },
+  selectorValue: { flex: 1, color: '#fff', fontSize: 15 },
+  selectorPlaceholder: { flex: 1, color: '#444', fontSize: 15 },
+  chevron: { color: '#555', fontSize: 22, marginLeft: 8 },
   input: {
     backgroundColor: CARD, borderRadius: 10, padding: 14,
     color: '#fff', fontSize: 15, borderWidth: 1, borderColor: BORDER,
