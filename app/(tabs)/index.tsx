@@ -19,16 +19,21 @@ import { EZVIDS_DEFAULTS } from '@/src/config/defaults';
 import { api } from '@/src/api/client';
 import type { PickerItem } from '@/src/components/PickerModal';
 
-// ─── Types ───────────────────────────────────────────────────
-interface TemplateItem {
-  id: string;
-  name: string;
-  description?: string;
-  thumbnailUrl?: string;
-}
+// ─── Visual Styles ───────────────────────────────────────────
+const VISUAL_STYLES = [
+  { id: 'AvatarBubbleTemplate', name: 'Avatar Bubble', desc: 'Floating avatar bubble over product' },
+  { id: 'GreenScreenEffectTemplate', name: 'Green Screen', desc: 'Avatar on custom background' },
+  { id: 'SimpleAvatarOverlayTemplate', name: 'Avatar Overlay', desc: 'Simple avatar overlay on product' },
+  { id: 'DynamicProductTemplate', name: 'Dynamic Product', desc: 'Animated product showcase' },
+  { id: 'FullScreenTemplate', name: 'Full Screen', desc: 'Full-screen avatar presentation' },
+  { id: 'QuickTransitionTemplate', name: 'Quick Transition', desc: 'Fast-paced transitions' },
+  { id: 'EnhancedVanillaTemplate', name: 'Enhanced Vanilla', desc: 'Clean, enhanced layout' },
+  { id: 'DynamicGreenScreenEffect', name: 'Dynamic Green Screen', desc: 'Animated green screen effect' },
+  { id: 'FeatureHighlightTemplate', name: 'Feature Highlight', desc: 'Product feature callouts' },
+] as const;
 
 // ─── Constants ───────────────────────────────────────────────
-const STEPS = ['voice over', 'avatar', 'product', 'template'] as const;
+const STEPS = ['voice over', 'avatar', 'product', 'style'] as const;
 const STEP_COUNT = STEPS.length;
 
 // ─── Wizard Header ──────────────────────────────────────────
@@ -60,7 +65,7 @@ export default function GenerateScreen() {
   const [voiceId, setVoiceId] = useState('');
   const [voiceName, setVoiceName] = useState('');
   const [productImageUrl, setProductImageUrl] = useState('');
-  const [templateId, setTemplateId] = useState('');
+  const [visualStyle, setVisualStyle] = useState('');
 
   // --- Segment toggle for step 1 ---
   const [avatarSegment, setAvatarSegment] = useState<'avatar' | 'voice'>('avatar');
@@ -68,13 +73,10 @@ export default function GenerateScreen() {
   // --- Data lists ---
   const [avatars, setAvatars] = useState<PickerItem[]>([]);
   const [voices, setVoices] = useState<PickerItem[]>([]);
-  const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [avatarsLoading, setAvatarsLoading] = useState(false);
   const [voicesLoading, setVoicesLoading] = useState(false);
-  const [templatesLoading, setTemplatesLoading] = useState(false);
   const [avatarsError, setAvatarsError] = useState<string | null>(null);
   const [voicesError, setVoicesError] = useState<string | null>(null);
-  const [templatesError, setTemplatesError] = useState<string | null>(null);
 
   // --- List refs for auto-scroll ---
   const avatarListRef = useRef<FlatList>(null);
@@ -128,29 +130,13 @@ export default function GenerateScreen() {
     }
   }, [voices.length]);
 
-  const fetchTemplates = useCallback(async () => {
-    if (templates.length > 0) return;
-    setTemplatesLoading(true);
-    setTemplatesError(null);
-    try {
-      const res = await api.getTemplates();
-      setTemplates(res.templates);
-    } catch (err) {
-      setTemplatesError(err instanceof Error ? err.message : 'Failed to load templates');
-    } finally {
-      setTemplatesLoading(false);
-    }
-  }, [templates.length]);
-
   // Auto-fetch when entering relevant steps
   useEffect(() => {
     if (step === 1) {
       fetchAvatars();
       fetchVoices();
-    } else if (step === 3) {
-      fetchTemplates();
     }
-  }, [step, fetchAvatars, fetchVoices, fetchTemplates]);
+  }, [step, fetchAvatars, fetchVoices]);
 
   // ─── Audio preview ────────────────────────────────────────
   const stopPlayback = useCallback(async () => {
@@ -234,7 +220,7 @@ export default function GenerateScreen() {
       avatarId:        avatarId.trim()         || undefined,
       voiceId:         voiceId.trim()          || undefined,
       productImageUrl: productImageUrl.trim()  || undefined,
-      templateId:      templateId.trim()       || undefined,
+      visualStyle:     visualStyle.trim()      || undefined,
     });
   };
 
@@ -256,7 +242,7 @@ export default function GenerateScreen() {
     setVoiceId('');
     setVoiceName('');
     setProductImageUrl('');
-    setTemplateId('');
+    setVisualStyle('');
   };
 
   // ─── Derived state ────────────────────────────────────────
@@ -334,27 +320,21 @@ export default function GenerateScreen() {
     );
   };
 
-  const renderTemplateCard = ({ item }: { item: TemplateItem }) => {
-    const selected = item.id === templateId;
+  const renderStyleCard = ({ item }: { item: typeof VISUAL_STYLES[number] }) => {
+    const selected = item.id === visualStyle;
     return (
       <TouchableOpacity
         style={[s.templateCard, selected && s.templateCardSelected]}
-        onPress={() => setTemplateId(item.id)}
+        onPress={() => setVisualStyle(item.id)}
         activeOpacity={0.7}
       >
-        {item.thumbnailUrl ? (
-          <Image source={{ uri: item.thumbnailUrl }} style={s.templateThumb} />
-        ) : (
-          <View style={[s.templateThumb, s.templateThumbPlaceholder]}>
-            <Text style={s.templateThumbIcon}>🎬</Text>
-          </View>
-        )}
+        <View style={[s.templateThumb, s.templateThumbPlaceholder]}>
+          <Text style={s.templateThumbIcon}>🎬</Text>
+        </View>
         <Text style={[s.templateName, selected && s.templateNameSelected]} numberOfLines={1}>
           {item.name}
         </Text>
-        {item.description ? (
-          <Text style={s.templateDesc} numberOfLines={2}>{item.description}</Text>
-        ) : null}
+        <Text style={s.templateDesc} numberOfLines={2}>{item.desc}</Text>
       </TouchableOpacity>
     );
   };
@@ -490,24 +470,17 @@ export default function GenerateScreen() {
             </ScrollView>
           )}
 
-          {/* ─── Step 3: Template ─── */}
+          {/* ─── Step 3: Visual Style ─── */}
           {step === 3 && (
             <View style={s.stepFlex}>
-              {templatesLoading || templatesError
-                ? renderListState(templatesLoading, templatesError)
-                : templates.length === 0
-                  ? <View style={s.listCenter}>
-                      <Text style={s.listHint}>No templates available.</Text>
-                    </View>
-                  : <FlatList
-                      data={templates}
-                      keyExtractor={(item) => item.id}
-                      numColumns={2}
-                      columnWrapperStyle={s.templateRow}
-                      renderItem={renderTemplateCard}
-                      contentContainerStyle={s.listPad}
-                    />
-              }
+              <FlatList
+                data={[...VISUAL_STYLES]}
+                keyExtractor={(item) => item.id}
+                numColumns={2}
+                columnWrapperStyle={s.templateRow}
+                renderItem={renderStyleCard}
+                contentContainerStyle={s.listPad}
+              />
             </View>
           )}
 

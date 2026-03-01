@@ -36,24 +36,4 @@ export interface VideoProvider {
     previewUrl?: string;
   }>>;
 
-  listTemplates(): Promise<Array<{
-    id: string;
-    name: string;
-    description?: string;
-    thumbnailUrl?: string;
-  }>>;
-
-  createTemplateJob(templateId: string, variables: Record<string, unknown>): Promise<{
-    providerJobId: string;
-    status: JobStatus;
-  }>;
-
-  checkTemplateJobStatus(providerJobId: string): Promise<{
-    status: JobStatus;
-    videoUrl?: string;
-    thumbnailUrl?: string;
-    creditsUsed?: number;
-    progress?: string;
-    errorMessage?: string;
-  }>;
 }

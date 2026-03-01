@@ -25,8 +25,8 @@ export interface VideoRequest {
     enabled: boolean;
     style?: string;
   };
-  /** If set, submit-worker uses the custom template job flow instead of lipsyncs */
-  templateId?: string;
+  /** Creatify visual style layout for the video (e.g. AvatarBubbleTemplate) */
+  visualStyle?: string;
 }
 
 /** What we store per job in Supabase */

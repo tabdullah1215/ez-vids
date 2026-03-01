@@ -78,6 +78,10 @@ export const creatifyProvider: VideoProvider = {
       payload.background_asset_image_url = req.productImageUrl;
     }
 
+    if (req.visualStyle) {
+      payload.visual_style = req.visualStyle;
+    }
+
     const res = await fetch(`${CREATIFY_BASE}/api/lipsyncs/`, {
       method: 'POST',
       headers: headers(),
@@ -166,69 +170,4 @@ export const creatifyProvider: VideoProvider = {
     return out;
   },
 
-  async listTemplates() {
-    const res = await fetch(`${CREATIFY_BASE}/api/custom_templates/`, {
-      method: 'GET',
-      headers: headers(),
-    });
-    if (res.status === 429) throw new RateLimitedError('listTemplates');
-    if (!res.ok) throw new Error(`listTemplates ${res.status}`);
-
-    const data = await res.json();
-    const list = Array.isArray(data) ? data : data.results || [];
-    return list.map((t: Record<string, unknown>) => ({
-      id: t.id as string,
-      name: (t.name as string) || 'Unnamed Template',
-      description: (t.description as string) || undefined,
-      thumbnailUrl: (t.thumbnail as string) || undefined,
-    }));
-  },
-
-  async createTemplateJob(templateId: string, variables: Record<string, unknown>) {
-    const payload = {
-      template_id: templateId,
-      ...variables,
-    };
-
-    const res = await fetch(`${CREATIFY_BASE}/api/custom_template_jobs/`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify(payload),
-    });
-
-    if (res.status === 429) throw new RateLimitedError('createTemplateJob');
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Creatify createTemplateJob ${res.status}: ${err}`);
-    }
-
-    const data = await res.json();
-    return {
-      providerJobId: data.id,
-      status: mapStatus(data.status || 'pending'),
-    };
-  },
-
-  async checkTemplateJobStatus(providerJobId: string) {
-    const res = await fetch(
-      `${CREATIFY_BASE}/api/custom_template_jobs/${providerJobId}/`,
-      { method: 'GET', headers: headers() }
-    );
-
-    if (res.status === 429) throw new RateLimitedError('checkTemplateJobStatus');
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Creatify checkTemplateJobStatus ${res.status}: ${err}`);
-    }
-
-    const d = await res.json();
-    return {
-      status: mapStatus(d.status),
-      videoUrl: d.video_output || d.output || undefined,
-      thumbnailUrl: d.video_thumbnail || undefined,
-      creditsUsed: d.credits_used || undefined,
-      progress: d.progress || undefined,
-      errorMessage: d.failed_reason || undefined,
-    };
-  },
 };

@@ -53,12 +53,7 @@ Deno.serve(async (req: Request) => {
 
     for (const job of jobs) {
       try {
-        const result = job.request.templateId
-          ? await creatifyProvider.createTemplateJob(job.request.templateId, {
-              avatar_id: job.request.avatarId,
-              voiceover_id: job.request.voiceId,
-            })
-          : await creatifyProvider.createJob(job.request);
+        const result = await creatifyProvider.createJob(job.request);
 
         await db.from('video_jobs').update({
           provider_job_id: result.providerJobId,

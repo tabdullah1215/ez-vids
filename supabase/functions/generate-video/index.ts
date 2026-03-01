@@ -45,6 +45,7 @@ Deno.serve(async (req: Request) => {
         enabled: captionsEnabled,
         style: captionsEnabled ? EZVIDS_DEFAULTS.captionStyle : undefined,
       },
+      visualStyle: body.visualStyle,
     };
 
     const job = await service.createJob(userId, request);

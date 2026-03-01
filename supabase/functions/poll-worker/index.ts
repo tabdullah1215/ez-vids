@@ -57,9 +57,7 @@ Deno.serve(async (req: Request) => {
       if (!job.provider_job_id) continue;
 
       try {
-        const result = job.request?.templateId
-          ? await creatifyProvider.checkTemplateJobStatus(job.provider_job_id)
-          : await creatifyProvider.checkJobStatus(job.provider_job_id);
+        const result = await creatifyProvider.checkJobStatus(job.provider_job_id);
 
         const updates: Record<string, unknown> = {
           status: result.status,

@@ -11,7 +11,7 @@ export interface GenerateVideoAPIRequest {
   productName?: string;
   aspectRatio?: '9:16' | '1:1' | '16:9';
   captionsEnabled?: boolean;
-  templateId?: string;
+  visualStyle?: string;
 }
 
 /** POST /api/videos/generate — server returns this */
@@ -55,12 +55,3 @@ export interface VoiceListResponse {
   }>;
 }
 
-/** GET /api/templates — server returns this */
-export interface TemplateListResponse {
-  templates: Array<{
-    id: string;
-    name: string;
-    description?: string;
-    thumbnailUrl?: string;
-  }>;
-}
