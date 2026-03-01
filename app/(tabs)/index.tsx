@@ -14,22 +14,29 @@ import {
   Modal,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import * as ImagePicker from 'expo-image-picker';
 import { useVideoJob } from '@/src/hooks/useVideoJob';
 import { EZVIDS_DEFAULTS } from '@/src/config/defaults';
 import { api } from '@/src/api/client';
 import type { PickerItem } from '@/src/components/PickerModal';
 
-// ─── Visual Styles ───────────────────────────────────────────
+// ─── Visual Styles (from Creatify lipsyncs_v2 API) ───────────
+type AspectRatio = '9:16' | '16:9';
+
 const VISUAL_STYLES = [
-  { id: 'AvatarBubbleTemplate', name: 'Avatar Bubble', desc: 'Floating avatar bubble over product' },
-  { id: 'GreenScreenEffectTemplate', name: 'Green Screen', desc: 'Avatar on custom background' },
-  { id: 'SimpleAvatarOverlayTemplate', name: 'Avatar Overlay', desc: 'Simple avatar overlay on product' },
-  { id: 'DynamicProductTemplate', name: 'Dynamic Product', desc: 'Animated product showcase' },
-  { id: 'FullScreenTemplate', name: 'Full Screen', desc: 'Full-screen avatar presentation' },
-  { id: 'QuickTransitionTemplate', name: 'Quick Transition', desc: 'Fast-paced transitions' },
-  { id: 'EnhancedVanillaTemplate', name: 'Enhanced Vanilla', desc: 'Clean, enhanced layout' },
-  { id: 'DynamicGreenScreenEffect', name: 'Dynamic Green Screen', desc: 'Animated green screen effect' },
-  { id: 'FeatureHighlightTemplate', name: 'Feature Highlight', desc: 'Product feature callouts' },
+  { id: 'FullAvatar', name: 'Full Avatar', desc: 'Full-screen avatar presentation', ratios: ['9:16', '16:9'] as AspectRatio[] },
+  { id: 'GreenScreenEffect', name: 'Green Screen', desc: 'Avatar on custom background', ratios: ['9:16', '16:9'] as AspectRatio[] },
+  { id: 'FullAvatarScreenProductOverlay', name: 'Avatar + Product', desc: 'Avatar with product overlay', ratios: ['9:16', '16:9'] as AspectRatio[] },
+  { id: 'UpAndDown', name: 'Up & Down', desc: 'Avatar above, product below', ratios: ['9:16'] as AspectRatio[] },
+  { id: 'SideBySide', name: 'Side by Side', desc: 'Avatar and product side by side', ratios: ['16:9'] as AspectRatio[] },
+  { id: 'FullProduct', name: 'Full Product', desc: 'Full-screen product showcase', ratios: ['9:16', '16:9'] as AspectRatio[] },
+  { id: 'MagnifyingGlassCircle', name: 'Magnifying Glass', desc: 'Avatar in magnifying glass circle', ratios: ['9:16', '16:9'] as AspectRatio[] },
+  { id: 'ReverseMagnifyingGlassCircle', name: 'Reverse Glass', desc: 'Product in magnifying glass circle', ratios: ['9:16', '16:9'] as AspectRatio[] },
+  { id: 'TwitterFrame', name: 'Twitter Frame', desc: 'Social media frame layout', ratios: ['9:16', '16:9'] as AspectRatio[] },
+  { id: 'DramaticFullProduct', name: 'Dramatic Product', desc: 'Dramatic full-screen product', ratios: ['9:16'] as AspectRatio[] },
+  { id: 'Dramatic', name: 'Dramatic', desc: 'Dramatic avatar presentation', ratios: ['9:16'] as AspectRatio[] },
+  { id: 'Vanilla', name: 'Vanilla', desc: 'Clean, simple layout', ratios: ['9:16', '16:9'] as AspectRatio[] },
+  { id: 'Vlog', name: 'Vlog', desc: 'Vlog-style vertical layout', ratios: ['9:16'] as AspectRatio[] },
 ] as const;
 
 // ─── Constants ───────────────────────────────────────────────
@@ -66,6 +73,10 @@ export default function GenerateScreen() {
   const [voiceName, setVoiceName] = useState('');
   const [productImageUrl, setProductImageUrl] = useState('');
   const [visualStyle, setVisualStyle] = useState('');
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pickedImageUri, setPickedImageUri] = useState<string | null>(null);
 
   // --- Segment toggle for step 1 ---
   const [avatarSegment, setAvatarSegment] = useState<'avatar' | 'voice'>('avatar');
@@ -213,6 +224,56 @@ export default function GenerateScreen() {
   }, []);
 
   // ─── Handlers ─────────────────────────────────────────────
+  const handlePickImage = async () => {
+    setUploadError(null);
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library to upload product images.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+    if (!asset.base64) {
+      setUploadError('Could not read image data.');
+      return;
+    }
+
+    setPickedImageUri(asset.uri);
+    setUploadingImage(true);
+
+    try {
+      const { url } = await api.uploadProductImage(asset.base64, asset.mimeType || 'image/jpeg');
+      setProductImageUrl(url);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+      setPickedImageUri(null);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleAspectRatioChange = (ratio: AspectRatio) => {
+    setAspectRatio(ratio);
+    // Clear visual style if it's incompatible with the new ratio
+    if (visualStyle) {
+      const style = VISUAL_STYLES.find((s) => s.id === visualStyle);
+      if (style && !style.ratios.includes(ratio)) {
+        setVisualStyle('');
+      }
+    }
+  };
+
   const handleGenerate = () => {
     job.submit({
       voiceMode: 'tts',
@@ -221,6 +282,7 @@ export default function GenerateScreen() {
       voiceId:         voiceId.trim()          || undefined,
       productImageUrl: productImageUrl.trim()  || undefined,
       visualStyle:     visualStyle.trim()      || undefined,
+      aspectRatio,
     });
   };
 
@@ -243,6 +305,9 @@ export default function GenerateScreen() {
     setVoiceName('');
     setProductImageUrl('');
     setVisualStyle('');
+    setAspectRatio('9:16');
+    setPickedImageUri(null);
+    setUploadError(null);
   };
 
   // ─── Derived state ────────────────────────────────────────
@@ -455,14 +520,65 @@ export default function GenerateScreen() {
           {step === 2 && (
             <ScrollView style={s.stepContent} contentContainerStyle={s.stepScroll}>
               <Text style={s.stepHint}>
-                Paste an image URL of your product (optional).
+                Upload a product image or paste a URL (optional).
               </Text>
+
+              {/* Upload button */}
+              <TouchableOpacity
+                style={s.uploadBtn}
+                onPress={handlePickImage}
+                disabled={uploadingImage}
+                activeOpacity={0.7}
+              >
+                {uploadingImage ? (
+                  <ActivityIndicator size="small" color={BRAND} />
+                ) : (
+                  <Text style={s.uploadBtnText}>Choose from Camera Roll</Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Upload error */}
+              {uploadError && (
+                <Text style={s.uploadError}>{uploadError}</Text>
+              )}
+
+              {/* Image preview */}
+              {(pickedImageUri || productImageUrl) && (
+                <View style={s.previewContainer}>
+                  <Image
+                    source={{ uri: pickedImageUri || productImageUrl }}
+                    style={s.productPreview}
+                    resizeMode="cover"
+                  />
+                  <TouchableOpacity
+                    style={s.removeBtn}
+                    onPress={() => {
+                      setPickedImageUri(null);
+                      setProductImageUrl('');
+                    }}
+                  >
+                    <Text style={s.removeBtnText}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Divider */}
+              <View style={s.dividerRow}>
+                <View style={s.dividerLine} />
+                <Text style={s.dividerText}>OR</Text>
+                <View style={s.dividerLine} />
+              </View>
+
+              {/* URL input */}
               <TextInput
                 style={s.input}
                 placeholder="https://..."
                 placeholderTextColor="#666"
                 value={productImageUrl}
-                onChangeText={setProductImageUrl}
+                onChangeText={(text) => {
+                  setProductImageUrl(text);
+                  setPickedImageUri(null);
+                }}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
@@ -473,8 +589,26 @@ export default function GenerateScreen() {
           {/* ─── Step 3: Visual Style ─── */}
           {step === 3 && (
             <View style={s.stepFlex}>
+              {/* Aspect ratio toggle */}
+              <View style={s.ratioRow}>
+                <TouchableOpacity
+                  style={[s.ratioBtn, aspectRatio === '9:16' && s.ratioBtnActive]}
+                  onPress={() => handleAspectRatioChange('9:16')}
+                >
+                  <View style={[s.ratioIcon, s.ratioPortrait, aspectRatio === '9:16' && s.ratioIconActive]} />
+                  <Text style={[s.ratioLabel, aspectRatio === '9:16' && s.ratioLabelActive]}>Portrait</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.ratioBtn, aspectRatio === '16:9' && s.ratioBtnActive]}
+                  onPress={() => handleAspectRatioChange('16:9')}
+                >
+                  <View style={[s.ratioIcon, s.ratioLandscape, aspectRatio === '16:9' && s.ratioIconActive]} />
+                  <Text style={[s.ratioLabel, aspectRatio === '16:9' && s.ratioLabelActive]}>Landscape</Text>
+                </TouchableOpacity>
+              </View>
+
               <FlatList
-                data={[...VISUAL_STYLES]}
+                data={VISUAL_STYLES.filter((st) => st.ratios.includes(aspectRatio))}
                 keyExtractor={(item) => item.id}
                 numColumns={2}
                 columnWrapperStyle={s.templateRow}
@@ -668,6 +802,27 @@ const s = StyleSheet.create({
   playIcon: { color: BRAND, fontSize: 18, fontWeight: '900' },
   zoomIcon: { color: BRAND, fontSize: 20 },
 
+  // ─── Aspect ratio toggle ───
+  ratioRow: {
+    flexDirection: 'row', justifyContent: 'center', gap: 12,
+    marginHorizontal: 20, marginBottom: 14,
+  },
+  ratioBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 10, paddingHorizontal: 20,
+    borderRadius: 10, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: CARD,
+  },
+  ratioBtnActive: { borderColor: BRAND, backgroundColor: '#1a1a2e' },
+  ratioIcon: {
+    borderRadius: 3, borderWidth: 2, borderColor: '#666',
+  },
+  ratioIconActive: { borderColor: BRAND },
+  ratioPortrait: { width: 14, height: 22 },
+  ratioLandscape: { width: 22, height: 14 },
+  ratioLabel: { color: '#999', fontSize: 15, fontWeight: '600' },
+  ratioLabelActive: { color: '#fff' },
+
   // ─── Template grid ───
   templateRow: { gap: 12, paddingHorizontal: 16, marginBottom: 12 },
   templateCard: {
@@ -700,6 +855,35 @@ const s = StyleSheet.create({
     backgroundColor: CARD, borderRadius: 10, padding: 14,
     color: '#fff', fontSize: 17, borderWidth: 1, borderColor: BORDER,
     minHeight: 140, textAlignVertical: 'top',
+  },
+
+  // ─── Product upload ───
+  uploadBtn: {
+    backgroundColor: CARD, borderRadius: 12,
+    borderWidth: 1, borderColor: BRAND, borderStyle: 'dashed' as const,
+    paddingVertical: 16, alignItems: 'center', justifyContent: 'center',
+    marginBottom: 12,
+  },
+  uploadBtnText: { color: BRAND, fontSize: 17, fontWeight: '600' },
+  uploadError: {
+    color: '#F87171', fontSize: 14, textAlign: 'center', marginBottom: 8,
+  },
+  previewContainer: { alignItems: 'center', marginBottom: 12 },
+  productPreview: {
+    width: 160, height: 160, borderRadius: 12,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+  },
+  removeBtn: {
+    marginTop: 8, paddingVertical: 6, paddingHorizontal: 16,
+    borderRadius: 8, borderWidth: 1, borderColor: '#666',
+  },
+  removeBtnText: { color: '#999', fontSize: 14 },
+  dividerRow: {
+    flexDirection: 'row', alignItems: 'center', marginVertical: 16,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: BORDER },
+  dividerText: {
+    color: '#666', fontSize: 14, fontWeight: '600', marginHorizontal: 12,
   },
 
   // ─── Footer nav ───

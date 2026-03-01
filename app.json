@@ -36,6 +36,12 @@
             "backgroundColor": "#0F0F0F"
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "EZ Vids needs access to your photos to use product images in your videos."
+        }
       ]
     ],
     "experiments": {

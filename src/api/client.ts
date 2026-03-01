@@ -72,6 +72,11 @@ class EZVidsApiClient {
     return this.invoke<{ jobs: JobStatusAPIResponse[] }>('list-jobs');
   }
 
+  /** Upload a product image and get its public URL */
+  uploadProductImage(base64: string, mimeType?: string) {
+    return this.invoke<{ url: string }>('upload-product-image', { base64, mimeType });
+  }
+
   /** Health check — verify Edge Functions are reachable */
   health() {
     return this.invoke<{ service: string; status: string }>('health');

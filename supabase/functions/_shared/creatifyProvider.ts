@@ -56,33 +56,42 @@ export const creatifyProvider: VideoProvider = {
   name: 'creatify',
 
   async createJob(req: VideoRequest) {
-    const payload: Record<string, unknown> = {
-      creator: req.avatarId,
-      aspect_ratio: fmtRatio(req.aspectRatio),
-      no_caption: !req.captions.enabled,
+    // Build the v2 segment
+    const segment: Record<string, unknown> = {
+      character: {
+        type: 'avatar',
+        avatar_id: req.avatarId,
+        avatar_style: 'normal',
+        offset: { x: 0, y: 0 },
+      },
+      voice: req.voiceMode === 'user_audio' && req.audioUrl
+        ? { type: 'audio', input_audio: req.audioUrl }
+        : { type: 'text', input_text: req.scriptText, voice_id: req.voiceId },
+      background: {
+        type: 'image',
+        url: req.productImageUrl || 'https://placehold.co/600x600/111111/111111',
+        fit: 'crop',
+      },
     };
 
-    if (req.captions.enabled && req.captions.style) {
-      payload.caption_style = req.captions.style;
-    }
-
-    // Voice branching: user audio vs TTS
-    if (req.voiceMode === 'user_audio' && req.audioUrl) {
-      payload.audio = req.audioUrl;
-    } else {
-      payload.text = req.scriptText;
-      if (req.voiceId) payload.accent = req.voiceId;
-    }
-
-    if (req.productImageUrl) {
-      payload.background_asset_image_url = req.productImageUrl;
-    }
-
+    // Visual style (overrides character/background positioning when set)
     if (req.visualStyle) {
-      payload.visual_style = req.visualStyle;
+      segment.visual_style = req.visualStyle;
     }
 
-    const res = await fetch(`${CREATIFY_BASE}/api/lipsyncs/`, {
+    // Captions
+    if (req.captions.enabled && req.captions.style) {
+      segment.caption_setting = { style: req.captions.style };
+    }
+
+    const payload = {
+      video_inputs: [segment],
+      aspect_ratio: fmtRatio(req.aspectRatio),
+    };
+
+    console.log('[creatify] POST /api/lipsyncs_v2/', JSON.stringify(payload));
+
+    const res = await fetch(`${CREATIFY_BASE}/api/lipsyncs_v2/`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify(payload),
@@ -103,7 +112,7 @@ export const creatifyProvider: VideoProvider = {
 
   async checkJobStatus(providerJobId: string) {
     const res = await fetch(
-      `${CREATIFY_BASE}/api/lipsyncs/${providerJobId}/`,
+      `${CREATIFY_BASE}/api/lipsyncs_v2/${providerJobId}/`,
       { method: 'GET', headers: headers() }
     );
 
