@@ -4,6 +4,7 @@ import type {
   JobStatusAPIResponse,
   AvatarListResponse,
   VoiceListResponse,
+  TemplateListResponse,
 } from '../types/api';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -65,6 +66,11 @@ class EZVidsApiClient {
   /** List available TTS voices (cached server-side) */
   getVoices() {
     return this.invoke<VoiceListResponse>('list-voices');
+  }
+
+  /** List available video templates (cached server-side) */
+  getTemplates() {
+    return this.invoke<TemplateListResponse>('list-templates');
   }
 
   /** List all jobs for the current user */

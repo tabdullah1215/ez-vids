@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,17 +6,52 @@ import {
   Image,
   TouchableOpacity,
   StyleSheet,
+  FlatList,
   ScrollView,
   Linking,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { useVideoJob } from '@/src/hooks/useVideoJob';
 import { EZVIDS_DEFAULTS } from '@/src/config/defaults';
 import { api } from '@/src/api/client';
-import { PickerModal, type PickerItem } from '@/src/components/PickerModal';
+import type { PickerItem } from '@/src/components/PickerModal';
 
+// ─── Types ───────────────────────────────────────────────────
+interface TemplateItem {
+  id: string;
+  name: string;
+  description?: string;
+  thumbnailUrl?: string;
+}
+
+// ─── Constants ───────────────────────────────────────────────
+const STEPS = ['voice over', 'avatar', 'product', 'template'] as const;
+const STEP_COUNT = STEPS.length;
+
+// ─── Wizard Header ──────────────────────────────────────────
+function WizardHeader({ step }: { step: number }) {
+  return (
+    <View style={s.header}>
+      <Text style={s.logo}>EZ Vids</Text>
+      <Text style={s.subtitle}>GENERATE VIDEO</Text>
+      <Text style={s.stepTitle}>{'· ' + STEPS[step] + ' ·'}</Text>
+      <View style={s.dots}>
+        {STEPS.map((_, i) => (
+          <View key={i} style={[s.dot, i <= step && s.dotActive]} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ─── Main Component ─────────────────────────────────────────
 export default function GenerateScreen() {
+  // --- Wizard step ---
+  const [step, setStep] = useState(0);
+
   // --- Form state ---
   const [scriptText, setScriptText] = useState('');
   const [avatarId, setAvatarId] = useState('');
@@ -25,35 +60,34 @@ export default function GenerateScreen() {
   const [voiceId, setVoiceId] = useState('');
   const [voiceName, setVoiceName] = useState('');
   const [productImageUrl, setProductImageUrl] = useState('');
+  const [templateId, setTemplateId] = useState('');
 
-  // --- Picker modal state ---
-  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
-  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  // --- Segment toggle for step 1 ---
+  const [avatarSegment, setAvatarSegment] = useState<'avatar' | 'voice'>('avatar');
+
+  // --- Data lists ---
   const [avatars, setAvatars] = useState<PickerItem[]>([]);
   const [voices, setVoices] = useState<PickerItem[]>([]);
+  const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [avatarsLoading, setAvatarsLoading] = useState(false);
   const [voicesLoading, setVoicesLoading] = useState(false);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
   const [avatarsError, setAvatarsError] = useState<string | null>(null);
   const [voicesError, setVoicesError] = useState<string | null>(null);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
 
-  // --- Connection test state ---
-  const [apiOk, setApiOk] = useState<boolean | null>(null);
+  // --- Audio preview ---
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  // --- Zoom preview ---
+  const [previewItem, setPreviewItem] = useState<PickerItem | null>(null);
 
   const job = useVideoJob();
 
-  // --- Handlers ---
-  const handleTestConnection = async () => {
-    try {
-      const result = await api.health();
-      setApiOk(result.status === 'ok');
-    } catch {
-      setApiOk(false);
-    }
-  };
-
-  const openAvatarModal = async () => {
-    setAvatarModalOpen(true);
-    if (avatars.length > 0) return; // already cached
+  // ─── Data fetching ────────────────────────────────────────
+  const fetchAvatars = useCallback(async () => {
+    if (avatars.length > 0) return;
     setAvatarsLoading(true);
     setAvatarsError(null);
     try {
@@ -69,11 +103,10 @@ export default function GenerateScreen() {
     } finally {
       setAvatarsLoading(false);
     }
-  };
+  }, [avatars.length]);
 
-  const openVoiceModal = async () => {
-    setVoiceModalOpen(true);
-    if (voices.length > 0) return; // already cached
+  const fetchVoices = useCallback(async () => {
+    if (voices.length > 0) return;
     setVoicesLoading(true);
     setVoicesError(null);
     try {
@@ -89,8 +122,71 @@ export default function GenerateScreen() {
     } finally {
       setVoicesLoading(false);
     }
-  };
+  }, [voices.length]);
 
+  const fetchTemplates = useCallback(async () => {
+    if (templates.length > 0) return;
+    setTemplatesLoading(true);
+    setTemplatesError(null);
+    try {
+      const res = await api.getTemplates();
+      setTemplates(res.templates);
+    } catch (err) {
+      setTemplatesError(err instanceof Error ? err.message : 'Failed to load templates');
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, [templates.length]);
+
+  // Auto-fetch when entering relevant steps
+  useEffect(() => {
+    if (step === 1) {
+      fetchAvatars();
+      fetchVoices();
+    } else if (step === 3) {
+      fetchTemplates();
+    }
+  }, [step, fetchAvatars, fetchVoices, fetchTemplates]);
+
+  // ─── Audio preview ────────────────────────────────────────
+  const stopPlayback = useCallback(async () => {
+    if (soundRef.current) {
+      try { await soundRef.current.unloadAsync(); } catch {}
+      soundRef.current = null;
+    }
+    setPlayingId(null);
+  }, []);
+
+  const handlePlay = useCallback(async (item: PickerItem) => {
+    if (playingId === item.id) {
+      await stopPlayback();
+      return;
+    }
+    await stopPlayback();
+    if (!item.previewUrl) return;
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: item.previewUrl },
+        { shouldPlay: true },
+      );
+      soundRef.current = sound;
+      setPlayingId(item.id);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          stopPlayback();
+        }
+      });
+    } catch {
+      setPlayingId(null);
+    }
+  }, [playingId, stopPlayback]);
+
+  // Stop audio when leaving step 1
+  useEffect(() => {
+    if (step !== 1) stopPlayback();
+  }, [step, stopPlayback]);
+
+  // ─── Handlers ─────────────────────────────────────────────
   const handleGenerate = () => {
     job.submit({
       voiceMode: 'tts',
@@ -98,6 +194,7 @@ export default function GenerateScreen() {
       avatarId:        avatarId.trim()         || undefined,
       voiceId:         voiceId.trim()          || undefined,
       productImageUrl: productImageUrl.trim()  || undefined,
+      templateId:      templateId.trim()       || undefined,
     });
   };
 
@@ -109,315 +206,542 @@ export default function GenerateScreen() {
     }
   };
 
-  // --- Derived state ---
-  const showForm = job.phase === 'idle';
+  const handleMakeAnother = () => {
+    job.reset();
+    setStep(0);
+    setScriptText('');
+    setAvatarId('');
+    setAvatarName('');
+    setAvatarImageUrl('');
+    setVoiceId('');
+    setVoiceName('');
+    setProductImageUrl('');
+    setTemplateId('');
+  };
+
+  // ─── Derived state ────────────────────────────────────────
+  const showWizard = job.phase === 'idle';
   const showLoading = job.phase === 'submitting' || job.phase === 'polling';
   const showSuccess = job.phase === 'completed' && !!job.videoUrl;
   const showError = job.phase === 'failed';
 
-  return (
-    <>
-    <ScrollView style={s.container} contentContainerStyle={s.content}>
+  // ─── Render helpers ───────────────────────────────────────
+  const renderAvatarRow = ({ item }: { item: PickerItem }) => {
+    const selected = item.id === avatarId;
+    return (
+      <TouchableOpacity
+        style={[s.row, selected && s.rowSelected]}
+        onPress={() => {
+          setAvatarId(item.id);
+          setAvatarName(item.label);
+          setAvatarImageUrl(item.imageUrl ?? '');
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={[s.accentBar, selected && s.accentBarActive]} />
+        {item.imageUrl ? (
+          <Image source={{ uri: item.imageUrl }} style={s.thumb} />
+        ) : null}
+        <View style={s.rowText}>
+          <Text style={[s.rowLabel, selected && s.rowLabelSelected]}>{item.label}</Text>
+          {item.sublabel ? (
+            <Text style={[s.rowSublabel, selected && s.rowSublabelSelected]}>{item.sublabel}</Text>
+          ) : null}
+        </View>
+        {item.imageUrl ? (
+          <TouchableOpacity
+            style={[s.actionBtn, selected && s.actionBtnSelected]}
+            onPress={() => setPreviewItem(item)}
+            hitSlop={8}
+          >
+            <Text style={s.zoomIcon}>⊕</Text>
+          </TouchableOpacity>
+        ) : null}
+      </TouchableOpacity>
+    );
+  };
 
-      {/* ========== HEADER ========== */}
-      <Text style={s.logo}>EZVids</Text>
-      <Text style={s.tagline}>Voice memo → TikTok-ready video</Text>
-
-      {/* ========== FORM (idle) ========== */}
-      {showForm && (
-        <>
-          {/* API Connection Test */}
-          <TouchableOpacity style={s.testBtn} onPress={handleTestConnection}>
-            <Text style={s.testBtnText}>
-              {apiOk === null
-                ? '🔌 Test API Connection'
-                : apiOk
-                ? '✅ API Connected'
-                : '❌ API Unreachable — Check Setup Guide'}
+  const renderVoiceRow = ({ item }: { item: PickerItem }) => {
+    const selected = item.id === voiceId;
+    return (
+      <TouchableOpacity
+        style={[s.row, selected && s.rowSelected]}
+        onPress={() => {
+          setVoiceId(item.id);
+          setVoiceName(item.sublabel ? `${item.label} · ${item.sublabel}` : item.label);
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={[s.accentBar, selected && s.accentBarActive]} />
+        <View style={s.rowText}>
+          <Text style={[s.rowLabel, selected && s.rowLabelSelected]}>{item.label}</Text>
+          {item.sublabel ? (
+            <Text style={[s.rowSublabel, selected && s.rowSublabelSelected]}>{item.sublabel}</Text>
+          ) : null}
+        </View>
+        {item.previewUrl ? (
+          <TouchableOpacity
+            style={[s.actionBtn, selected && s.actionBtnSelected]}
+            onPress={() => handlePlay(item)}
+            hitSlop={8}
+          >
+            <Text style={s.playIcon}>
+              {playingId === item.id ? '■' : '▶︎'}
             </Text>
           </TouchableOpacity>
+        ) : null}
+      </TouchableOpacity>
+    );
+  };
 
-          <Text style={s.sectionHint}>
-            All fields optional — tap Generate to use defaults.
-          </Text>
-
-          {/* Script */}
-          <View style={s.field}>
-            <Text style={s.label}>SCRIPT</Text>
-            <TextInput
-              style={s.textArea}
-              multiline
-              numberOfLines={4}
-              placeholder={EZVIDS_DEFAULTS.scriptText}
-              placeholderTextColor="#333"
-              value={scriptText}
-              onChangeText={setScriptText}
-            />
+  const renderTemplateCard = ({ item }: { item: TemplateItem }) => {
+    const selected = item.id === templateId;
+    return (
+      <TouchableOpacity
+        style={[s.templateCard, selected && s.templateCardSelected]}
+        onPress={() => setTemplateId(item.id)}
+        activeOpacity={0.7}
+      >
+        {item.thumbnailUrl ? (
+          <Image source={{ uri: item.thumbnailUrl }} style={s.templateThumb} />
+        ) : (
+          <View style={[s.templateThumb, s.templateThumbPlaceholder]}>
+            <Text style={s.templateThumbIcon}>🎬</Text>
           </View>
+        )}
+        <Text style={[s.templateName, selected && s.templateNameSelected]} numberOfLines={1}>
+          {item.name}
+        </Text>
+        {item.description ? (
+          <Text style={s.templateDesc} numberOfLines={2}>{item.description}</Text>
+        ) : null}
+      </TouchableOpacity>
+    );
+  };
 
-          {/* Avatar Picker */}
-          <View style={s.field}>
-            <Text style={s.label}>AVATAR</Text>
-            <TouchableOpacity style={s.selector} onPress={openAvatarModal} activeOpacity={0.7}>
-              {avatarImageUrl ? (
-                <Image source={{ uri: avatarImageUrl }} style={s.selectorThumb} />
-              ) : null}
-              <Text style={avatarId ? s.selectorValue : s.selectorPlaceholder} numberOfLines={1}>
-                {avatarName || 'Select avatar…'}
+  // ─── Inline loading/error for lists ───────────────────────
+  const renderListState = (loading: boolean, error: string | null) => {
+    if (loading) {
+      return (
+        <View style={s.listCenter}>
+          <ActivityIndicator size="large" color={BRAND} />
+          <Text style={s.listHint}>Loading...</Text>
+        </View>
+      );
+    }
+    if (error) {
+      return (
+        <View style={s.listCenter}>
+          <Text style={s.errorText}>{error}</Text>
+        </View>
+      );
+    }
+    return null;
+  };
+
+  // ═════════════════════════════════════════════════════════════
+  // RENDER
+  // ═════════════════════════════════════════════════════════════
+  return (
+    <View style={s.container}>
+      {/* ─── Header (always visible) ─── */}
+      <WizardHeader step={showWizard ? step : 0} />
+
+      {/* ═══ WIZARD STEPS ═══ */}
+      {showWizard && (
+        <>
+          {/* ─── Step 0: Voice Over (Script) ─── */}
+          {step === 0 && (
+            <ScrollView style={s.stepContent} contentContainerStyle={s.stepScroll}>
+              <Text style={s.stepHint}>
+                Write your script or leave empty for a default.
               </Text>
-              <Text style={s.chevron}>›</Text>
-            </TouchableOpacity>
-          </View>
+              <TextInput
+                style={s.textArea}
+                multiline
+                numberOfLines={6}
+                placeholder={EZVIDS_DEFAULTS.scriptText}
+                placeholderTextColor="#666"
+                value={scriptText}
+                onChangeText={setScriptText}
+              />
+            </ScrollView>
+          )}
 
-          {/* Voice Picker */}
-          <View style={s.field}>
-            <Text style={s.label}>VOICE</Text>
-            <TouchableOpacity style={s.selector} onPress={openVoiceModal} activeOpacity={0.7}>
-              <Text style={voiceId ? s.selectorValue : s.selectorPlaceholder} numberOfLines={1}>
-                {voiceName || 'Select voice…'}
+          {/* ─── Step 1: Avatar + Voice (segment toggle) ─── */}
+          {step === 1 && (
+            <View style={s.stepFlex}>
+              {/* Segment toggle */}
+              <View style={s.segmentRow}>
+                <TouchableOpacity
+                  style={[s.segmentBtn, avatarSegment === 'avatar' && s.segmentBtnActive]}
+                  onPress={() => setAvatarSegment('avatar')}
+                >
+                  <Text style={[s.segmentText, avatarSegment === 'avatar' && s.segmentTextActive]}>
+                    Avatar
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.segmentBtn, avatarSegment === 'voice' && s.segmentBtnActive]}
+                  onPress={() => setAvatarSegment('voice')}
+                >
+                  <Text style={[s.segmentText, avatarSegment === 'voice' && s.segmentTextActive]}>
+                    Voice
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Selection summary */}
+              {(avatarName || voiceName) && (
+                <View style={s.selectionSummary}>
+                  {avatarName ? <Text style={s.selectionText}>Avatar: {avatarName}</Text> : null}
+                  {voiceName ? <Text style={s.selectionText}>Voice: {voiceName}</Text> : null}
+                </View>
+              )}
+
+              {/* Avatar list */}
+              {avatarSegment === 'avatar' && (
+                avatarsLoading || avatarsError
+                  ? renderListState(avatarsLoading, avatarsError)
+                  : <FlatList
+                      data={avatars}
+                      keyExtractor={(item) => item.id}
+                      renderItem={renderAvatarRow}
+                      ItemSeparatorComponent={() => <View style={s.separator} />}
+                      contentContainerStyle={s.listPad}
+                    />
+              )}
+
+              {/* Voice list */}
+              {avatarSegment === 'voice' && (
+                voicesLoading || voicesError
+                  ? renderListState(voicesLoading, voicesError)
+                  : <FlatList
+                      data={voices}
+                      keyExtractor={(item) => item.id}
+                      renderItem={renderVoiceRow}
+                      ItemSeparatorComponent={() => <View style={s.separator} />}
+                      contentContainerStyle={s.listPad}
+                    />
+              )}
+            </View>
+          )}
+
+          {/* ─── Step 2: Product ─── */}
+          {step === 2 && (
+            <ScrollView style={s.stepContent} contentContainerStyle={s.stepScroll}>
+              <Text style={s.stepHint}>
+                Paste an image URL of your product (optional).
               </Text>
-              <Text style={s.chevron}>›</Text>
-            </TouchableOpacity>
-          </View>
+              <TextInput
+                style={s.input}
+                placeholder="https://..."
+                placeholderTextColor="#666"
+                value={productImageUrl}
+                onChangeText={setProductImageUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+            </ScrollView>
+          )}
 
-          {/* Product Image */}
-          <View style={s.field}>
-            <Text style={s.label}>PRODUCT IMAGE URL (optional)</Text>
-            <TextInput
-              style={s.input}
-              placeholder="https://..."
-              placeholderTextColor="#333"
-              value={productImageUrl}
-              onChangeText={setProductImageUrl}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-            />
-          </View>
+          {/* ─── Step 3: Template ─── */}
+          {step === 3 && (
+            <View style={s.stepFlex}>
+              {templatesLoading || templatesError
+                ? renderListState(templatesLoading, templatesError)
+                : templates.length === 0
+                  ? <View style={s.listCenter}>
+                      <Text style={s.listHint}>No templates available.</Text>
+                    </View>
+                  : <FlatList
+                      data={templates}
+                      keyExtractor={(item) => item.id}
+                      numColumns={2}
+                      columnWrapperStyle={s.templateRow}
+                      renderItem={renderTemplateCard}
+                      contentContainerStyle={s.listPad}
+                    />
+              }
+            </View>
+          )}
 
-          {/* Generate Button */}
-          <TouchableOpacity
-            style={s.generateBtn}
-            onPress={handleGenerate}
-            activeOpacity={0.8}
-          >
-            <Text style={s.generateBtnText}>Generate Video</Text>
-          </TouchableOpacity>
+          {/* ─── Footer Nav ─── */}
+          <View style={s.footer}>
+            {step > 0 ? (
+              <TouchableOpacity style={s.backBtn} onPress={() => setStep(step - 1)}>
+                <Text style={s.backBtnText}>← Back</Text>
+              </TouchableOpacity>
+            ) : (
+              <View />
+            )}
 
-          {/* Defaults Info */}
-          <View style={s.infoBox}>
-            <Text style={s.infoTitle}>MVP Defaults</Text>
-            <Text style={s.infoLine}>Mode: TTS (text-to-speech)</Text>
-            <Text style={s.infoLine}>Aspect: 9:16 (vertical)</Text>
-            <Text style={s.infoLine}>Captions: ON</Text>
-            <Text style={s.infoLine}>Backend: Supabase Edge Functions → Creatify API</Text>
+            {step < STEP_COUNT - 1 ? (
+              <TouchableOpacity style={s.nextBtn} onPress={() => setStep(step + 1)}>
+                <Text style={s.nextBtnText}>Next →</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={s.generateBtn} onPress={handleGenerate} activeOpacity={0.8}>
+                <Text style={s.generateBtnText}>Generate Video</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </>
       )}
 
-      {/* ========== LOADING (submitting / polling) ========== */}
+      {/* ═══ LOADING ═══ */}
       {showLoading && (
         <View style={s.center}>
-          <ActivityIndicator size="large" color="#6366F1" />
+          <ActivityIndicator size="large" color={BRAND} />
           <Text style={s.statusTitle}>
-            {job.phase === 'submitting'
-              ? 'Submitting...'
-              : 'Creating your video...'}
+            {job.phase === 'submitting' ? 'Submitting...' : 'Creating your video...'}
           </Text>
-
           {job.providerStatus && (
-            <Text style={s.statusLabel}>
-              Status: {job.providerStatus}
-            </Text>
+            <Text style={s.statusLabel}>Status: {job.providerStatus}</Text>
           )}
-
           <Text style={s.elapsed}>{job.elapsedSeconds}s</Text>
-
-          <Text style={s.statusHint}>
-            Usually ready in 30–90 seconds.
-          </Text>
-
+          <Text style={s.statusHint}>Usually ready in 30–90 seconds.</Text>
           {job.jobId && (
             <Text style={s.mono}>Job: {job.jobId.slice(0, 8)}...</Text>
           )}
         </View>
       )}
 
-      {/* ========== SUCCESS ========== */}
+      {/* ═══ SUCCESS ═══ */}
       {showSuccess && (
         <View style={s.center}>
           <Text style={s.bigEmoji}>🎬</Text>
           <Text style={s.statusTitle}>Video Ready!</Text>
-
-          <TouchableOpacity
-            style={s.primaryBtn}
-            onPress={handleOpenVideo}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity style={s.primaryBtn} onPress={handleOpenVideo} activeOpacity={0.8}>
             <Text style={s.primaryBtnText}>▶ Open Video</Text>
           </TouchableOpacity>
-
-          <Text style={s.urlText} numberOfLines={2}>
-            {job.videoUrl}
-          </Text>
-
-          <TouchableOpacity style={s.secondaryBtn} onPress={job.reset}>
+          <Text style={s.urlText} numberOfLines={2}>{job.videoUrl}</Text>
+          <TouchableOpacity style={s.secondaryBtn} onPress={handleMakeAnother}>
             <Text style={s.secondaryBtnText}>Make Another</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* ========== ERROR ========== */}
+      {/* ═══ ERROR ═══ */}
       {showError && (
         <View style={s.center}>
           <Text style={s.bigEmoji}>⚠️</Text>
           <Text style={s.statusTitle}>Something Went Wrong</Text>
           <Text style={s.errorText}>{job.error}</Text>
-
-          <TouchableOpacity style={s.secondaryBtn} onPress={job.reset}>
+          <TouchableOpacity style={s.secondaryBtn} onPress={handleMakeAnother}>
             <Text style={s.secondaryBtnText}>Try Again</Text>
           </TouchableOpacity>
         </View>
       )}
-    </ScrollView>
 
-    {/* ========== MODALS ========== */}
-    <PickerModal
-      visible={avatarModalOpen}
-      title="Select Avatar"
-      items={avatars}
-      selectedId={avatarId || null}
-      loading={avatarsLoading}
-      error={avatarsError}
-      onSelect={(id) => {
-        const a = avatars.find((a) => a.id === id);
-        setAvatarId(id);
-        setAvatarName(a?.label ?? id);
-        setAvatarImageUrl(a?.imageUrl ?? '');
-      }}
-      onClose={() => setAvatarModalOpen(false)}
-    />
-
-    <PickerModal
-      visible={voiceModalOpen}
-      title="Select Voice"
-      items={voices}
-      selectedId={voiceId || null}
-      loading={voicesLoading}
-      error={voicesError}
-      onSelect={(id) => {
-        setVoiceId(id);
-        const v = voices.find((v) => v.id === id);
-        setVoiceName(v ? `${v.label}${v.sublabel ? ` · ${v.sublabel}` : ''}` : id);
-      }}
-      onClose={() => setVoiceModalOpen(false)}
-    />
-    </>
+      {/* ═══ Zoom preview modal ═══ */}
+      {previewItem?.imageUrl && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setPreviewItem(null)}>
+          <TouchableOpacity
+            style={s.previewBackdrop}
+            activeOpacity={1}
+            onPress={() => setPreviewItem(null)}
+          >
+            <Image source={{ uri: previewItem.imageUrl }} style={s.previewImage} resizeMode="contain" />
+            <Text style={s.previewCaption}>{previewItem.label}</Text>
+          </TouchableOpacity>
+        </Modal>
+      )}
+    </View>
   );
 }
 
-// =============================================================
+// ═════════════════════════════════════════════════════════════
 // Styles
-// =============================================================
+// ═════════════════════════════════════════════════════════════
 
-const BRAND = '#6366F1'; // Indigo-500
+const BRAND = '#6366F1';
 const BG = '#0A0A0A';
 const CARD = '#141414';
 const BORDER = '#262626';
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
-  content: { padding: 20, paddingTop: 56, paddingBottom: 80 },
+  container: { flex: 1, backgroundColor: BG, paddingTop: 56 },
 
-  // Header
+  // ─── Header ───
+  header: { alignItems: 'center', paddingBottom: 16 },
   logo: {
     fontSize: 32, fontWeight: '800', color: '#fff',
     textAlign: 'center', letterSpacing: -0.5,
   },
-  tagline: {
-    fontSize: 14, color: '#666', textAlign: 'center',
-    marginTop: 4, marginBottom: 20,
+  subtitle: {
+    fontSize: 13, color: '#666', fontWeight: '600',
+    letterSpacing: 3, textAlign: 'center', marginTop: 6,
+  },
+  stepTitle: {
+    fontSize: 19, color: BRAND, fontWeight: '400',
+    textAlign: 'center', marginTop: 4,
+  },
+  dots: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  dot: {
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: '#333',
+  },
+  dotActive: { backgroundColor: BRAND },
+
+  // ─── Step content ───
+  stepContent: { flex: 1 },
+  stepScroll: { padding: 20, paddingBottom: 20 },
+  stepFlex: { flex: 1 },
+  stepHint: {
+    color: '#999', fontSize: 15, marginBottom: 16,
+    textAlign: 'center',
   },
 
-  // Test button
-  testBtn: {
-    backgroundColor: CARD, borderRadius: 8, padding: 12,
-    borderWidth: 1, borderColor: BORDER, marginBottom: 16,
-  },
-  testBtnText: { color: '#aaa', fontSize: 13, textAlign: 'center' },
-
-  sectionHint: {
-    color: '#555', fontSize: 12, textAlign: 'center', marginBottom: 20,
-  },
-
-  // Form
-  field: { marginBottom: 14 },
-  label: { color: '#999', fontSize: 13, fontWeight: '600', marginBottom: 5 },
-  selector: {
-    backgroundColor: CARD, borderRadius: 10, padding: 14,
+  // ─── Segment toggle ───
+  segmentRow: {
+    flexDirection: 'row', marginHorizontal: 20, marginBottom: 12,
+    backgroundColor: CARD, borderRadius: 10, padding: 3,
     borderWidth: 1, borderColor: BORDER,
+  },
+  segmentBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: 8,
+    alignItems: 'center',
+  },
+  segmentBtnActive: { backgroundColor: BRAND },
+  segmentText: { color: '#aaa', fontSize: 16, fontWeight: '600' },
+  segmentTextActive: { color: '#fff' },
+
+  // ─── Selection summary ───
+  selectionSummary: {
+    flexDirection: 'row', gap: 16, justifyContent: 'center',
+    paddingHorizontal: 20, paddingBottom: 8,
+  },
+  selectionText: { color: '#bbb', fontSize: 14 },
+
+  // ─── Lists ───
+  listPad: { paddingBottom: 8 },
+  listCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  listHint: { color: '#999', marginTop: 12, fontSize: 16 },
+  separator: { height: 1, backgroundColor: BORDER, marginHorizontal: 20 },
+
+  // ─── List rows (shared with avatar + voice) ───
+  row: {
     flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 14, paddingRight: 20, paddingLeft: 16,
+    backgroundColor: BG,
   },
-  selectorThumb: {
-    width: 32, height: 32, borderRadius: 16,
-    marginRight: 10, backgroundColor: '#262626',
+  rowSelected: { backgroundColor: CARD },
+  accentBar: {
+    width: 3, alignSelf: 'stretch', borderRadius: 2,
+    marginRight: 12, backgroundColor: 'transparent',
   },
-  selectorValue: { flex: 1, color: '#fff', fontSize: 15 },
-  selectorPlaceholder: { flex: 1, color: '#444', fontSize: 15 },
-  chevron: { color: '#555', fontSize: 22, marginLeft: 8 },
+  accentBarActive: { backgroundColor: BRAND },
+  thumb: {
+    width: 44, height: 44, borderRadius: 22,
+    marginRight: 12, backgroundColor: CARD,
+  },
+  rowText: { flex: 1 },
+  rowLabel: { fontSize: 17, color: '#e0e0e0' },
+  rowLabelSelected: { color: '#fff', fontWeight: '600' },
+  rowSublabel: { fontSize: 14, color: '#999', marginTop: 2 },
+  rowSublabelSelected: { color: '#bbb' },
+  actionBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center', marginLeft: 8,
+  },
+  actionBtnSelected: { borderColor: BRAND },
+  playIcon: { color: BRAND, fontSize: 18, fontWeight: '900' },
+  zoomIcon: { color: BRAND, fontSize: 20 },
+
+  // ─── Template grid ───
+  templateRow: { gap: 12, paddingHorizontal: 16, marginBottom: 12 },
+  templateCard: {
+    flex: 1, backgroundColor: CARD, borderRadius: 12,
+    borderWidth: 1, borderColor: BORDER, overflow: 'hidden',
+  },
+  templateCardSelected: { borderColor: BRAND, borderWidth: 2 },
+  templateThumb: {
+    width: '100%', aspectRatio: 16 / 9,
+    backgroundColor: '#1a1a1a',
+  },
+  templateThumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  templateThumbIcon: { fontSize: 32 },
+  templateName: {
+    color: '#e0e0e0', fontSize: 15, fontWeight: '600',
+    paddingHorizontal: 10, paddingTop: 8,
+  },
+  templateNameSelected: { color: '#fff' },
+  templateDesc: {
+    color: '#999', fontSize: 13, lineHeight: 17,
+    paddingHorizontal: 10, paddingTop: 4, paddingBottom: 10,
+  },
+
+  // ─── Form inputs ───
   input: {
     backgroundColor: CARD, borderRadius: 10, padding: 14,
-    color: '#fff', fontSize: 15, borderWidth: 1, borderColor: BORDER,
+    color: '#fff', fontSize: 17, borderWidth: 1, borderColor: BORDER,
   },
   textArea: {
     backgroundColor: CARD, borderRadius: 10, padding: 14,
-    color: '#fff', fontSize: 15, borderWidth: 1, borderColor: BORDER,
-    minHeight: 96, textAlignVertical: 'top',
+    color: '#fff', fontSize: 17, borderWidth: 1, borderColor: BORDER,
+    minHeight: 140, textAlignVertical: 'top',
   },
 
-  // Generate CTA
+  // ─── Footer nav ───
+  footer: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', paddingHorizontal: 20,
+    paddingVertical: 16, borderTopWidth: 1, borderColor: BORDER,
+  },
+  backBtn: {
+    paddingVertical: 12, paddingHorizontal: 20,
+    borderWidth: 1, borderColor: '#333', borderRadius: 10,
+  },
+  backBtnText: { color: '#bbb', fontSize: 17 },
+  nextBtn: {
+    backgroundColor: BRAND, borderRadius: 12,
+    paddingVertical: 12, paddingHorizontal: 28,
+  },
+  nextBtnText: { color: '#fff', fontSize: 17, fontWeight: '600' },
   generateBtn: {
-    backgroundColor: BRAND, borderRadius: 14, padding: 18,
-    alignItems: 'center', marginTop: 8, marginBottom: 20,
+    backgroundColor: BRAND, borderRadius: 12,
+    paddingVertical: 12, paddingHorizontal: 24,
   },
   generateBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
 
-  // Info box
-  infoBox: {
-    backgroundColor: '#0F0F1A', borderRadius: 10, padding: 16,
-    borderWidth: 1, borderColor: '#1E1E3A',
-  },
-  infoTitle: { color: '#818CF8', fontWeight: '700', marginBottom: 6, fontSize: 13 },
-  infoLine: { color: '#555', fontSize: 12, lineHeight: 20 },
-
-  // Centered states
-  center: { alignItems: 'center', paddingTop: 80 },
+  // ─── Loading / Success / Error ───
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
   bigEmoji: { fontSize: 56, marginBottom: 8 },
-  statusTitle: { fontSize: 22, fontWeight: '700', color: '#fff', marginTop: 16 },
-  statusLabel: { fontSize: 14, color: '#888', marginTop: 8 },
-  statusHint: { fontSize: 13, color: '#555', marginTop: 16, textAlign: 'center' },
+  statusTitle: { fontSize: 24, fontWeight: '700', color: '#fff', marginTop: 16 },
+  statusLabel: { fontSize: 16, color: '#bbb', marginTop: 8 },
+  statusHint: { fontSize: 15, color: '#999', marginTop: 16, textAlign: 'center' },
   elapsed: { fontSize: 40, fontWeight: '200', color: BRAND, marginTop: 16 },
-  mono: { fontSize: 11, color: '#444', marginTop: 20, fontFamily: 'monospace' },
-
-  // Buttons
+  mono: { fontSize: 13, color: '#888', marginTop: 20, fontFamily: 'monospace' },
   primaryBtn: {
     backgroundColor: BRAND, borderRadius: 14,
     paddingVertical: 14, paddingHorizontal: 36, marginTop: 24,
   },
-  primaryBtnText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  primaryBtnText: { color: '#fff', fontSize: 19, fontWeight: '600' },
   secondaryBtn: {
     borderWidth: 1, borderColor: '#333', borderRadius: 10,
     paddingVertical: 12, paddingHorizontal: 28, marginTop: 20,
   },
-  secondaryBtnText: { color: '#888', fontSize: 15 },
-
-  // Misc
+  secondaryBtnText: { color: '#bbb', fontSize: 17 },
   urlText: {
-    fontSize: 11, color: '#444', marginTop: 12,
+    fontSize: 13, color: '#888', marginTop: 12,
     textAlign: 'center', paddingHorizontal: 24,
   },
   errorText: {
-    color: '#F87171', fontSize: 14, marginTop: 12,
-    textAlign: 'center', paddingHorizontal: 24, lineHeight: 20,
+    color: '#F87171', fontSize: 16, marginTop: 12,
+    textAlign: 'center', paddingHorizontal: 24, lineHeight: 22,
+  },
+
+  // ─── Zoom preview ───
+  previewBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
+    alignItems: 'center', justifyContent: 'center', padding: 32,
+  },
+  previewImage: { width: '100%', aspectRatio: 1, borderRadius: 16 },
+  previewCaption: {
+    color: '#fff', fontSize: 18, fontWeight: '600',
+    marginTop: 16, textAlign: 'center',
   },
 });
