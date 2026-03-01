@@ -23,20 +23,22 @@ import type { PickerItem } from '@/src/components/PickerModal';
 // ─── Visual Styles (from Creatify lipsyncs_v2 API) ───────────
 type AspectRatio = '9:16' | '16:9';
 
+const STYLE_IMG = 'https://dpbavq092lwjh.cloudfront.net/visual_styles';
+
 const VISUAL_STYLES = [
-  { id: 'FullAvatar', name: 'Full Avatar', desc: 'Full-screen avatar presentation', ratios: ['9:16', '16:9'] as AspectRatio[] },
-  { id: 'GreenScreenEffect', name: 'Green Screen', desc: 'Avatar on custom background', ratios: ['9:16', '16:9'] as AspectRatio[] },
-  { id: 'FullAvatarScreenProductOverlay', name: 'Avatar + Product', desc: 'Avatar with product overlay', ratios: ['9:16', '16:9'] as AspectRatio[] },
-  { id: 'UpAndDown', name: 'Up & Down', desc: 'Avatar above, product below', ratios: ['9:16'] as AspectRatio[] },
-  { id: 'SideBySide', name: 'Side by Side', desc: 'Avatar and product side by side', ratios: ['16:9'] as AspectRatio[] },
-  { id: 'FullProduct', name: 'Full Product', desc: 'Full-screen product showcase', ratios: ['9:16', '16:9'] as AspectRatio[] },
-  { id: 'MagnifyingGlassCircle', name: 'Magnifying Glass', desc: 'Avatar in magnifying glass circle', ratios: ['9:16', '16:9'] as AspectRatio[] },
-  { id: 'ReverseMagnifyingGlassCircle', name: 'Reverse Glass', desc: 'Product in magnifying glass circle', ratios: ['9:16', '16:9'] as AspectRatio[] },
-  { id: 'TwitterFrame', name: 'Twitter Frame', desc: 'Social media frame layout', ratios: ['9:16', '16:9'] as AspectRatio[] },
-  { id: 'DramaticFullProduct', name: 'Dramatic Product', desc: 'Dramatic full-screen product', ratios: ['9:16'] as AspectRatio[] },
-  { id: 'Dramatic', name: 'Dramatic', desc: 'Dramatic avatar presentation', ratios: ['9:16'] as AspectRatio[] },
-  { id: 'Vanilla', name: 'Vanilla', desc: 'Clean, simple layout', ratios: ['9:16', '16:9'] as AspectRatio[] },
-  { id: 'Vlog', name: 'Vlog', desc: 'Vlog-style vertical layout', ratios: ['9:16'] as AspectRatio[] },
+  { id: 'FullAvatar', name: 'Full Avatar', desc: 'Full-screen avatar presentation', ratios: ['9:16', '16:9'] as AspectRatio[], img: `${STYLE_IMG}/FullAvatar.png` },
+  { id: 'GreenScreenEffect', name: 'Green Screen', desc: 'Avatar on custom background', ratios: ['9:16', '16:9'] as AspectRatio[], img: `${STYLE_IMG}/GreenScreenEffect.png` },
+  { id: 'FullAvatarScreenProductOverlay', name: 'Avatar + Product', desc: 'Avatar with product overlay', ratios: ['9:16', '16:9'] as AspectRatio[], img: `${STYLE_IMG}/FullAvatarScreenProductOverlay.png` },
+  { id: 'UpAndDown', name: 'Up & Down', desc: 'Avatar above, product below', ratios: ['9:16'] as AspectRatio[], img: `${STYLE_IMG}/UpAndDown.png` },
+  { id: 'SideBySide', name: 'Side by Side', desc: 'Avatar and product side by side', ratios: ['16:9'] as AspectRatio[], img: `${STYLE_IMG}/SideBySide.png` },
+  { id: 'FullProduct', name: 'Full Product', desc: 'Full-screen product showcase', ratios: ['9:16', '16:9'] as AspectRatio[], img: `${STYLE_IMG}/FullProduct.png` },
+  { id: 'MagnifyingGlassCircle', name: 'Magnifying Glass', desc: 'Avatar in magnifying glass circle', ratios: ['9:16', '16:9'] as AspectRatio[], img: `${STYLE_IMG}/MagnifyingGlassCircle.png` },
+  { id: 'ReverseMagnifyingGlassCircle', name: 'Reverse Glass', desc: 'Product in magnifying glass circle', ratios: ['9:16', '16:9'] as AspectRatio[], img: `${STYLE_IMG}/ReverseMagnifyingGlassCircle.png` },
+  { id: 'TwitterFrame', name: 'Twitter Frame', desc: 'Social media frame layout', ratios: ['9:16', '16:9'] as AspectRatio[], img: `${STYLE_IMG}/TwitterFrame.png` },
+  { id: 'DramaticFullProduct', name: 'Dramatic Product', desc: 'Dramatic full-screen product', ratios: ['9:16'] as AspectRatio[], img: `${STYLE_IMG}/DramaticFullProduct.png` },
+  { id: 'Dramatic', name: 'Dramatic', desc: 'Dramatic avatar presentation', ratios: ['9:16'] as AspectRatio[], img: `${STYLE_IMG}/Dramatic.png` },
+  { id: 'Vanilla', name: 'Vanilla', desc: 'Clean, simple layout', ratios: ['9:16', '16:9'] as AspectRatio[], img: `${STYLE_IMG}/Vanilla.png` },
+  { id: 'Vlog', name: 'Vlog', desc: 'Vlog-style vertical layout', ratios: ['9:16'] as AspectRatio[], img: `${STYLE_IMG}/Vlog.png` },
 ] as const;
 
 // ─── Constants ───────────────────────────────────────────────
@@ -393,9 +395,11 @@ export default function GenerateScreen() {
         onPress={() => setVisualStyle(item.id)}
         activeOpacity={0.7}
       >
-        <View style={[s.templateThumb, s.templateThumbPlaceholder]}>
-          <Text style={s.templateThumbIcon}>🎬</Text>
-        </View>
+        <Image
+          source={{ uri: item.img }}
+          style={s.templateThumb}
+          resizeMode="contain"
+        />
         <Text style={[s.templateName, selected && s.templateNameSelected]} numberOfLines={1}>
           {item.name}
         </Text>
@@ -831,11 +835,9 @@ const s = StyleSheet.create({
   },
   templateCardSelected: { borderColor: BRAND, borderWidth: 2 },
   templateThumb: {
-    width: '100%', aspectRatio: 16 / 9,
+    width: '100%', aspectRatio: 1,
     backgroundColor: '#1a1a1a',
   },
-  templateThumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  templateThumbIcon: { fontSize: 32 },
   templateName: {
     color: '#e0e0e0', fontSize: 15, fontWeight: '600',
     paddingHorizontal: 10, paddingTop: 8,
