@@ -76,6 +76,10 @@ export default function GenerateScreen() {
   const [voicesError, setVoicesError] = useState<string | null>(null);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
 
+  // --- List refs for auto-scroll ---
+  const avatarListRef = useRef<FlatList>(null);
+  const voiceListRef = useRef<FlatList>(null);
+
   // --- Audio preview ---
   const [playingId, setPlayingId] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -185,6 +189,42 @@ export default function GenerateScreen() {
   useEffect(() => {
     if (step !== 1) stopPlayback();
   }, [step, stopPlayback]);
+
+  // ─── Auto-scroll to selected item on step/segment change ──
+  const scrollTarget = useRef<{ ref: React.RefObject<FlatList>; index: number } | null>(null);
+
+  useEffect(() => {
+    if (step !== 1) return;
+    const ref = avatarSegment === 'avatar' ? avatarListRef : voiceListRef;
+    const data = avatarSegment === 'avatar' ? avatars : voices;
+    const selectedId = avatarSegment === 'avatar' ? avatarId : voiceId;
+    if (!selectedId || data.length === 0) return;
+    const idx = data.findIndex((item) => item.id === selectedId);
+    if (idx > 0) {
+      scrollTarget.current = { ref, index: idx };
+      setTimeout(() => {
+        ref.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.3 });
+      }, 300);
+    }
+  }, [step, avatarSegment, avatars, voices, avatarId, voiceId]);
+
+  const handleScrollToIndexFailed = useCallback((info: { index: number; averageItemLength: number }) => {
+    const target = scrollTarget.current;
+    if (!target) return;
+    // Scroll to estimated offset to force rendering of nearby items
+    target.ref.current?.scrollToOffset({
+      offset: info.averageItemLength * info.index,
+      animated: false,
+    });
+    // Retry after items near the target have rendered
+    setTimeout(() => {
+      target.ref.current?.scrollToIndex({
+        index: info.index,
+        animated: true,
+        viewPosition: 0.3,
+      });
+    }, 200);
+  }, []);
 
   // ─── Handlers ─────────────────────────────────────────────
   const handleGenerate = () => {
@@ -404,11 +444,13 @@ export default function GenerateScreen() {
                 avatarsLoading || avatarsError
                   ? renderListState(avatarsLoading, avatarsError)
                   : <FlatList
+                      ref={avatarListRef}
                       data={avatars}
                       keyExtractor={(item) => item.id}
                       renderItem={renderAvatarRow}
                       ItemSeparatorComponent={() => <View style={s.separator} />}
                       contentContainerStyle={s.listPad}
+                      onScrollToIndexFailed={handleScrollToIndexFailed}
                     />
               )}
 
@@ -417,11 +459,13 @@ export default function GenerateScreen() {
                 voicesLoading || voicesError
                   ? renderListState(voicesLoading, voicesError)
                   : <FlatList
+                      ref={voiceListRef}
                       data={voices}
                       keyExtractor={(item) => item.id}
                       renderItem={renderVoiceRow}
                       ItemSeparatorComponent={() => <View style={s.separator} />}
                       contentContainerStyle={s.listPad}
+                      onScrollToIndexFailed={handleScrollToIndexFailed}
                     />
               )}
             </View>
@@ -559,7 +603,7 @@ export default function GenerateScreen() {
 const BRAND = '#6366F1';
 const BG = '#0A0A0A';
 const CARD = '#141414';
-const BORDER = '#262626';
+const BORDER = '#4a4a4a';
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG, paddingTop: 56 },
@@ -581,7 +625,7 @@ const s = StyleSheet.create({
   dots: { flexDirection: 'row', gap: 8, marginTop: 10 },
   dot: {
     width: 8, height: 8, borderRadius: 4,
-    backgroundColor: '#333',
+    backgroundColor: '#666',
   },
   dotActive: { backgroundColor: BRAND },
 
@@ -693,7 +737,7 @@ const s = StyleSheet.create({
   },
   backBtn: {
     paddingVertical: 12, paddingHorizontal: 20,
-    borderWidth: 1, borderColor: '#333', borderRadius: 10,
+    borderWidth: 1, borderColor: '#666', borderRadius: 10,
   },
   backBtnText: { color: '#bbb', fontSize: 17 },
   nextBtn: {
@@ -721,7 +765,7 @@ const s = StyleSheet.create({
   },
   primaryBtnText: { color: '#fff', fontSize: 19, fontWeight: '600' },
   secondaryBtn: {
-    borderWidth: 1, borderColor: '#333', borderRadius: 10,
+    borderWidth: 1, borderColor: '#666', borderRadius: 10,
     paddingVertical: 12, paddingHorizontal: 28, marginTop: 20,
   },
   secondaryBtnText: { color: '#bbb', fontSize: 17 },
