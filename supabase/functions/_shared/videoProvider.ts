@@ -36,4 +36,6 @@ export interface VideoProvider {
     previewUrl?: string;
   }>>;
 
+  getCreditBalance(): Promise<{ remainingCredits: number }>;
+
 }

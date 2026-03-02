@@ -4,6 +4,7 @@ import type {
   JobStatusAPIResponse,
   AvatarListResponse,
   VoiceListResponse,
+  CreditBalanceResponse,
 } from '../types/api';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -75,6 +76,11 @@ class EZVidsApiClient {
   /** Upload a product image and get its public URL */
   uploadProductImage(base64: string, mimeType?: string) {
     return this.invoke<{ url: string }>('upload-product-image', { base64, mimeType });
+  }
+
+  /** Get remaining Creatify credits */
+  getCreditBalance() {
+    return this.invoke<CreditBalanceResponse>('credit-balance');
   }
 
   /** Health check — verify Edge Functions are reachable */

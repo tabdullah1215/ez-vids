@@ -179,4 +179,16 @@ export const creatifyProvider: VideoProvider = {
     return out;
   },
 
+  async getCreditBalance() {
+    const res = await fetch(`${CREATIFY_BASE}/api/remaining_credits/`, {
+      method: 'GET',
+      headers: headers(),
+    });
+    if (res.status === 429) throw new RateLimitedError('getCreditBalance');
+    if (!res.ok) throw new Error(`getCreditBalance ${res.status}`);
+
+    const data = await res.json();
+    return { remainingCredits: data.remaining_credits as number };
+  },
+
 };

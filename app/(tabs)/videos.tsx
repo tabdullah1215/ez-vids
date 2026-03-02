@@ -105,6 +105,7 @@ export default function VideosScreen() {
   const [error, setError]       = useState<string | null>(null);
   const [now, setNow]           = useState(Date.now());
   const [orientationFilter, setOrientationFilter] = useState<OrientationFilter>('all');
+  const [remainingCredits, setRemainingCredits] = useState<number | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -116,11 +117,26 @@ export default function VideosScreen() {
     });
   }, [jobs, orientationFilter]);
 
+  const stats = useMemo(() => {
+    const totalCredits = jobs.reduce((sum, j) => sum + (j.creditsUsed ?? 0), 0);
+    const latest = jobs.length > 0
+      ? jobs.reduce((newest, j) => {
+          const t = j.completedAt ?? j.updatedAt;
+          return t > newest ? t : newest;
+        }, jobs[0].completedAt ?? jobs[0].updatedAt)
+      : null;
+    return { count: jobs.length, credits: totalCredits, latest };
+  }, [jobs]);
+
   const fetchJobs = useCallback(async (silent = false) => {
     if (!silent) setError(null);
     try {
-      const { jobs: fetched } = await api.getJobs();
+      const [{ jobs: fetched }, balance] = await Promise.all([
+        api.getJobs(),
+        api.getCreditBalance().catch(() => null),
+      ]);
       setJobs(fetched);
+      if (balance) setRemainingCredits(balance.remainingCredits);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load jobs');
     } finally {
@@ -174,7 +190,35 @@ export default function VideosScreen() {
 
   return (
     <View style={styles.container}>
-      <AppHeader subtitle="MY VIDEOS" />
+      <AppHeader subtitle="MY VIDEOS">
+        {jobs.length > 0 && (
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.count}</Text>
+              <Text style={styles.statLabel}>Videos</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.credits}</Text>
+              <Text style={styles.statLabel}>Used</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {remainingCredits != null ? remainingCredits : '—'}
+              </Text>
+              <Text style={styles.statLabel}>Remaining</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {stats.latest ? formatElapsed(stats.latest, now) : '—'}
+              </Text>
+              <Text style={styles.statLabel}>Latest</Text>
+            </View>
+          </View>
+        )}
+      </AppHeader>
 
       {/* Orientation filter (segment toggle) */}
       <View style={styles.segmentRow}>
@@ -240,6 +284,36 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // ─── Header stats ───
+  statsRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 16,
+    paddingHorizontal: 20,
+  },
+  statItem: {
+    alignItems: 'center' as const,
+  },
+  statValue: {
+    color: TEXT,
+    fontSize: 15,
+    fontWeight: '700' as const,
+  },
+  statLabel: {
+    color: MUTED,
+    fontSize: 10,
+    fontWeight: '600' as const,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+    marginTop: 1,
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: BORDER,
   },
 
   // ─── Segment toggle (orientation filter) ───

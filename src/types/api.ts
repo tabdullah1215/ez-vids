@@ -34,6 +34,11 @@ export interface JobStatusAPIResponse {
   completedAt?: string;
 }
 
+/** GET /api/credit-balance — server returns this */
+export interface CreditBalanceResponse {
+  remainingCredits: number;
+}
+
 /** GET /api/avatars — server returns this */
 export interface AvatarListResponse {
   avatars: Array<{
