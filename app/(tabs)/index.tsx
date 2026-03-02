@@ -75,6 +75,7 @@ export default function GenerateScreen() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [pickedImageUri, setPickedImageUri] = useState<string | null>(null);
+  const [highlightedStyleId, setHighlightedStyleId] = useState<string | null>(null);
 
   // --- Segment toggle for step 1 ---
   const [avatarSegment, setAvatarSegment] = useState<'avatar' | 'voice'>('avatar');
@@ -279,9 +280,28 @@ export default function GenerateScreen() {
     }
   };
 
+  const flashStyleTiles = useCallback(() => {
+    const visibleIds = VISUAL_STYLES
+      .filter((st) => st.ratios.includes(aspectRatio))
+      .map((st) => st.id);
+    // Shuffle
+    for (let i = visibleIds.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [visibleIds[i], visibleIds[j]] = [visibleIds[j], visibleIds[i]];
+    }
+    visibleIds.forEach((id, i) => {
+      setTimeout(() => setHighlightedStyleId(id), i * 80);
+    });
+    setTimeout(() => setHighlightedStyleId(null), visibleIds.length * 80);
+  }, [aspectRatio]);
+
   const TEST_VIDEO_URL = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
 
   const handleGenerate = () => {
+    if (!visualStyle) {
+      flashStyleTiles();
+      return;
+    }
     if (testMode) {
       job.mockComplete(TEST_VIDEO_URL);
       return;
@@ -398,9 +418,10 @@ export default function GenerateScreen() {
 
   const renderStyleCard = ({ item }: { item: typeof VISUAL_STYLES[number] }) => {
     const selected = item.id === visualStyle;
+    const highlighted = item.id === highlightedStyleId;
     return (
       <TouchableOpacity
-        style={[s.templateCard, selected && s.templateCardSelected]}
+        style={[s.templateCard, selected && s.templateCardSelected, highlighted && s.templateCardHighlighted]}
         onPress={() => setVisualStyle(item.id)}
         activeOpacity={0.7}
       >
@@ -949,6 +970,7 @@ const useStyles = createThemedStyles((c) => ({
     borderWidth: 1, borderColor: c.border, overflow: 'hidden' as const,
   },
   templateCardSelected: { borderColor: c.brand, borderWidth: 2 },
+  templateCardHighlighted: { borderColor: c.brand, borderWidth: 2 },
   templateThumb: {
     width: '100%' as const, aspectRatio: 1,
     backgroundColor: c.surfaceAlt,
