@@ -16,7 +16,7 @@ import type { JobStatusAPIResponse } from '@/src/types/api';
 
 const BG     = '#0A0A0A';
 const CARD   = '#141414';
-const BORDER = '#262626';
+const BORDER = '#4a4a4a';
 const BRAND  = '#6366F1';
 const TEXT   = '#FFFFFF';
 const MUTED  = '#6B7280';

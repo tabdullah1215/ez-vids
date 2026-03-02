@@ -19,6 +19,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { useVideoJob } from '@/src/hooks/useVideoJob';
 import { EZVIDS_DEFAULTS } from '@/src/config/defaults';
 import { api } from '@/src/api/client';
+import Animated, {
+  SlideInRight, SlideInLeft, SlideOutLeft, SlideOutRight,
+  useSharedValue, useAnimatedStyle, withSequence, withTiming,
+} from 'react-native-reanimated';
 import { AppHeader } from '@/src/components/AppHeader';
 import type { PickerItem } from '@/src/components/PickerModal';
 
@@ -51,6 +55,7 @@ const STEP_COUNT = STEPS.length;
 export default function GenerateScreen() {
   // --- Wizard step ---
   const [step, setStep] = useState(0);
+  const directionRef = useRef<'forward' | 'back'>('forward');
 
   // --- Form state ---
   const [scriptText, setScriptText] = useState('');
@@ -69,6 +74,12 @@ export default function GenerateScreen() {
 
   // --- Segment toggle for step 1 ---
   const [avatarSegment, setAvatarSegment] = useState<'avatar' | 'voice'>('avatar');
+
+  // --- Flash animation for missing avatar/voice ---
+  const avatarFlash = useSharedValue(0);
+  const voiceFlash = useSharedValue(0);
+  const avatarFlashStyle = useAnimatedStyle(() => ({ opacity: avatarFlash.value }));
+  const voiceFlashStyle = useAnimatedStyle(() => ({ opacity: voiceFlash.value }));
 
   // --- Data lists ---
   const [avatars, setAvatars] = useState<PickerItem[]>([]);
@@ -133,6 +144,7 @@ export default function GenerateScreen() {
   // Auto-fetch when entering relevant steps
   useEffect(() => {
     if (step === 1) {
+      setAvatarSegment('avatar');
       fetchAvatars();
       fetchVoices();
     }
@@ -456,7 +468,13 @@ export default function GenerateScreen() {
         <>
           {/* ─── Step 0: Voice Over (Script) ─── */}
           {step === 0 && (
-            <ScrollView style={s.stepContent} contentContainerStyle={s.stepScroll}>
+            <Animated.View
+              key="step0"
+              entering={directionRef.current === 'forward' ? SlideInRight.duration(250) : SlideInLeft.duration(250)}
+              exiting={directionRef.current === 'forward' ? SlideOutLeft.duration(250) : SlideOutRight.duration(250)}
+              style={s.stepContent}
+            >
+            <ScrollView contentContainerStyle={s.stepScroll}>
               <Text style={s.stepHint}>
                 Write your script or leave empty for a default.
               </Text>
@@ -486,29 +504,41 @@ export default function GenerateScreen() {
                 </Text>
               )}
             </ScrollView>
+            </Animated.View>
           )}
 
           {/* ─── Step 1: Avatar + Voice (segment toggle) ─── */}
           {step === 1 && (
-            <View style={s.stepFlex}>
+            <Animated.View
+              key="step1"
+              entering={directionRef.current === 'forward' ? SlideInRight.duration(250) : SlideInLeft.duration(250)}
+              exiting={directionRef.current === 'forward' ? SlideOutLeft.duration(250) : SlideOutRight.duration(250)}
+              style={s.stepFlex}
+            >
               {/* Segment toggle */}
               <View style={s.segmentRow}>
-                <TouchableOpacity
-                  style={[s.segmentBtn, avatarSegment === 'avatar' && s.segmentBtnActive]}
-                  onPress={() => setAvatarSegment('avatar')}
-                >
-                  <Text style={[s.segmentText, avatarSegment === 'avatar' && s.segmentTextActive]}>
-                    Avatar
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.segmentBtn, avatarSegment === 'voice' && s.segmentBtnActive]}
-                  onPress={() => setAvatarSegment('voice')}
-                >
-                  <Text style={[s.segmentText, avatarSegment === 'voice' && s.segmentTextActive]}>
-                    Voice
-                  </Text>
-                </TouchableOpacity>
+                <View style={[s.segmentBtn, avatarSegment === 'avatar' && s.segmentBtnActive]}>
+                  <Animated.View style={[s.flashOverlay, avatarFlashStyle]} pointerEvents="none" />
+                  <TouchableOpacity
+                    style={s.segmentBtnInner}
+                    onPress={() => setAvatarSegment('avatar')}
+                  >
+                    <Text style={[s.segmentText, avatarSegment === 'avatar' && s.segmentTextActive]}>
+                      Avatar
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={[s.segmentBtn, avatarSegment === 'voice' && s.segmentBtnActive]}>
+                  <Animated.View style={[s.flashOverlay, voiceFlashStyle]} pointerEvents="none" />
+                  <TouchableOpacity
+                    style={s.segmentBtnInner}
+                    onPress={() => setAvatarSegment('voice')}
+                  >
+                    <Text style={[s.segmentText, avatarSegment === 'voice' && s.segmentTextActive]}>
+                      Voice
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Selection summary */}
@@ -548,12 +578,18 @@ export default function GenerateScreen() {
                       onScrollToIndexFailed={handleScrollToIndexFailed}
                     />
               )}
-            </View>
+            </Animated.View>
           )}
 
           {/* ─── Step 2: Product ─── */}
           {step === 2 && (
-            <ScrollView style={s.stepContent} contentContainerStyle={s.stepScroll}>
+            <Animated.View
+              key="step2"
+              entering={directionRef.current === 'forward' ? SlideInRight.duration(250) : SlideInLeft.duration(250)}
+              exiting={directionRef.current === 'forward' ? SlideOutLeft.duration(250) : SlideOutRight.duration(250)}
+              style={s.stepContent}
+            >
+            <ScrollView contentContainerStyle={s.stepScroll}>
               <Text style={s.stepHint}>
                 Upload a product image or paste a URL (optional).
               </Text>
@@ -619,11 +655,17 @@ export default function GenerateScreen() {
                 keyboardType="url"
               />
             </ScrollView>
+            </Animated.View>
           )}
 
           {/* ─── Step 3: Visual Style ─── */}
           {step === 3 && (
-            <View style={s.stepFlex}>
+            <Animated.View
+              key="step3"
+              entering={directionRef.current === 'forward' ? SlideInRight.duration(250) : SlideInLeft.duration(250)}
+              exiting={directionRef.current === 'forward' ? SlideOutLeft.duration(250) : SlideOutRight.duration(250)}
+              style={s.stepFlex}
+            >
               {/* Aspect ratio toggle */}
               <View style={s.ratioRow}>
                 <TouchableOpacity
@@ -650,22 +692,42 @@ export default function GenerateScreen() {
                 renderItem={renderStyleCard}
                 contentContainerStyle={s.listPad}
               />
-            </View>
+            </Animated.View>
           )}
 
           {/* ─── Footer Nav ─── */}
           <View style={s.footer}>
             {step > 0 ? (
-              <TouchableOpacity style={s.backBtn} onPress={() => setStep(step - 1)}>
-                <Text style={s.backBtnText}>← Back</Text>
+              <TouchableOpacity style={s.backBtn} onPress={() => { directionRef.current = 'back'; setStep(step - 1); }}>
+                <Text style={s.backBtnText}>{'‹  Back'}</Text>
               </TouchableOpacity>
             ) : (
               <View />
             )}
 
             {step < STEP_COUNT - 1 ? (
-              <TouchableOpacity style={s.nextBtn} onPress={() => setStep(step + 1)}>
-                <Text style={s.nextBtnText}>Next →</Text>
+              <TouchableOpacity style={s.nextBtn} onPress={() => {
+                if (step === 1) {
+                  const needAvatar = !avatarId;
+                  const needVoice = !voiceId;
+                  if (needAvatar || needVoice) {
+                    const flash = (sv: typeof avatarFlash) => {
+                      sv.value = withSequence(
+                        withTiming(1, { duration: 120 }),
+                        withTiming(0, { duration: 120 }),
+                        withTiming(1, { duration: 120 }),
+                        withTiming(0, { duration: 120 }),
+                      );
+                    };
+                    if (needAvatar) flash(avatarFlash);
+                    if (needVoice) flash(voiceFlash);
+                    return;
+                  }
+                }
+                directionRef.current = 'forward';
+                setStep(step + 1);
+              }}>
+                <Text style={s.nextBtnText}>{'Next  ›'}</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity style={s.generateBtn} onPress={handleGenerate} activeOpacity={0.8}>
@@ -766,7 +828,7 @@ const s = StyleSheet.create({
   },
   stepCircle: {
     width: 28, height: 28, borderRadius: 14,
-    borderWidth: 2, borderColor: '#444',
+    borderWidth: 2, borderColor: '#999',
     alignItems: 'center', justifyContent: 'center',
   },
   stepCircleActive: {
@@ -776,7 +838,7 @@ const s = StyleSheet.create({
     borderColor: BRAND,
   },
   stepNum: {
-    fontSize: 14, fontWeight: '700', color: '#555',
+    fontSize: 14, fontWeight: '700', color: '#999',
   },
   stepNumActive: {
     color: '#fff',
@@ -785,7 +847,7 @@ const s = StyleSheet.create({
     textShadowRadius: 6,
   },
   stepLine: {
-    width: 24, height: 2, backgroundColor: '#444',
+    width: 24, height: 2, backgroundColor: '#999',
   },
   stepLineDone: { backgroundColor: BRAND },
 
@@ -805,10 +867,19 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER,
   },
   segmentBtn: {
-    flex: 1, paddingVertical: 10, borderRadius: 8,
-    alignItems: 'center',
+    flex: 1, borderRadius: 8,
+    overflow: 'hidden' as const,
+  },
+  segmentBtnInner: {
+    paddingVertical: 10,
+    alignItems: 'center' as const,
   },
   segmentBtnActive: { backgroundColor: BRAND },
+  flashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+  },
   segmentText: { color: '#aaa', fontSize: 16, fontWeight: '600' },
   segmentTextActive: { color: '#fff' },
 
@@ -954,10 +1025,10 @@ const s = StyleSheet.create({
     paddingVertical: 16, borderTopWidth: 1, borderColor: BORDER,
   },
   backBtn: {
-    paddingVertical: 12, paddingHorizontal: 20,
-    borderWidth: 1, borderColor: '#666', borderRadius: 10,
+    paddingVertical: 12, paddingHorizontal: 28,
+    borderWidth: 1, borderColor: '#666', borderRadius: 12,
   },
-  backBtnText: { color: '#bbb', fontSize: 17 },
+  backBtnText: { color: '#bbb', fontSize: 17, fontWeight: '600' },
   nextBtn: {
     backgroundColor: BRAND, borderRadius: 12,
     paddingVertical: 12, paddingHorizontal: 28,
