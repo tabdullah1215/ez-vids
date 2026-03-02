@@ -754,6 +754,11 @@ const s = StyleSheet.create({
   stepTitle: {
     fontSize: 19, color: BRAND, fontWeight: '400',
     textAlign: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 3,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   stepsRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -773,7 +778,12 @@ const s = StyleSheet.create({
   stepNum: {
     fontSize: 14, fontWeight: '700', color: '#555',
   },
-  stepNumActive: { color: '#fff' },
+  stepNumActive: {
+    color: '#fff',
+    textShadowColor: '#6366f1',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 6,
+  },
   stepLine: {
     width: 24, height: 2, backgroundColor: '#444',
   },
