@@ -187,5 +187,48 @@ export function useVideoJob() {
     });
   }, [cleanup]);
 
-  return { ...state, submit, reset };
+  /** Simulate the full submit → poll → complete flow without calling the API */
+  const mockComplete = useCallback((videoUrl: string) => {
+    cleanup();
+    startRef.current = Date.now();
+
+    // Phase 1: submitting
+    setState({
+      phase: 'submitting',
+      jobId: null,
+      providerStatus: null,
+      videoUrl: null,
+      error: null,
+      elapsedSeconds: 0,
+    });
+
+    // Elapsed timer
+    timerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startRef.current) / 1000);
+      setState((s) => ({ ...s, elapsedSeconds: elapsed }));
+    }, 1000);
+
+    // Phase 2: polling (after 1s)
+    pollRef.current = setTimeout(() => {
+      setState((s) => ({
+        ...s,
+        phase: 'polling',
+        jobId: 'test-mode',
+        providerStatus: 'rendering',
+      }));
+
+      // Phase 3: completed (after another 2s)
+      pollRef.current = setTimeout(() => {
+        cleanup();
+        setState((s) => ({
+          ...s,
+          phase: 'completed',
+          providerStatus: 'completed',
+          videoUrl,
+        }));
+      }, 2000);
+    }, 1000);
+  }, [cleanup]);
+
+  return { ...state, submit, reset, mockComplete };
 }

@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Switch,
 } from 'react-native';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
@@ -45,18 +46,22 @@ const VISUAL_STYLES = [
 const STEPS = ['voice over', 'avatar', 'product', 'style'] as const;
 const STEP_COUNT = STEPS.length;
 
-// ─── Wizard Header ──────────────────────────────────────────
-function WizardHeader({ step }: { step: number }) {
+// ─── Header ─────────────────────────────────────────────────
+function AppHeader({ step, wizardActive }: { step: number; wizardActive: boolean }) {
   return (
     <View style={s.header}>
       <Text style={s.logo}>EZ Vids</Text>
-      <Text style={s.subtitle}>GENERATE VIDEO</Text>
-      <Text style={s.stepTitle}>{'· ' + STEPS[step] + ' ·'}</Text>
-      <View style={s.dots}>
-        {STEPS.map((_, i) => (
-          <View key={i} style={[s.dot, i <= step && s.dotActive]} />
-        ))}
-      </View>
+      {wizardActive && (
+        <>
+          <Text style={s.subtitle}>GENERATE VIDEO</Text>
+          <Text style={s.stepTitle}>{'· ' + STEPS[step] + ' ·'}</Text>
+          <View style={s.dots}>
+            {STEPS.map((_, i) => (
+              <View key={i} style={[s.dot, i <= step && s.dotActive]} />
+            ))}
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -76,6 +81,7 @@ export default function GenerateScreen() {
   const [productImageUrl, setProductImageUrl] = useState('');
   const [visualStyle, setVisualStyle] = useState('');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
+  const [testMode, setTestMode] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [pickedImageUri, setPickedImageUri] = useState<string | null>(null);
@@ -276,7 +282,13 @@ export default function GenerateScreen() {
     }
   };
 
+  const TEST_VIDEO_URL = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+
   const handleGenerate = () => {
+    if (testMode) {
+      job.mockComplete(TEST_VIDEO_URL);
+      return;
+    }
     job.submit({
       voiceMode: 'tts',
       scriptText:      scriptText.trim()      || undefined,
@@ -434,7 +446,7 @@ export default function GenerateScreen() {
   return (
     <View style={s.container}>
       {/* ─── Header (always visible) ─── */}
-      <WizardHeader step={showWizard ? step : 0} />
+      <AppHeader step={step} wizardActive={showWizard} />
 
       {/* ═══ WIZARD STEPS ═══ */}
       {showWizard && (
@@ -454,6 +466,22 @@ export default function GenerateScreen() {
                 value={scriptText}
                 onChangeText={setScriptText}
               />
+
+              {/* Test mode toggle */}
+              <View style={s.testRow}>
+                <Text style={s.testLabel}>Test mode</Text>
+                <Switch
+                  value={testMode}
+                  onValueChange={setTestMode}
+                  trackColor={{ false: '#333', true: BRAND }}
+                  thumbColor={testMode ? '#fff' : '#888'}
+                />
+              </View>
+              {testMode && (
+                <Text style={s.testHint}>
+                  Skips Creatify API — returns a sample video instantly.
+                </Text>
+              )}
             </ScrollView>
           )}
 
@@ -857,6 +885,16 @@ const s = StyleSheet.create({
     backgroundColor: CARD, borderRadius: 10, padding: 14,
     color: '#fff', fontSize: 17, borderWidth: 1, borderColor: BORDER,
     minHeight: 140, textAlignVertical: 'top',
+  },
+
+  // ─── Test mode ───
+  testRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: 24, paddingVertical: 8,
+  },
+  testLabel: { color: '#888', fontSize: 15 },
+  testHint: {
+    color: '#666', fontSize: 13, marginTop: 4, fontStyle: 'italic',
   },
 
   // ─── Product upload ───
