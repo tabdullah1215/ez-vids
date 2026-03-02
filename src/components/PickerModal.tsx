@@ -7,10 +7,10 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  StyleSheet,
   SafeAreaView,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import { createThemedStyles, useTheme } from '@/src/theme';
 
 export interface PickerItem {
   id: string;
@@ -41,6 +41,8 @@ export function PickerModal({
   loading,
   error,
 }: Props) {
+  const s = useStyles();
+  const { colors } = useTheme();
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<PickerItem | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -116,7 +118,7 @@ export function PickerModal({
         {/* Content */}
         {loading ? (
           <View style={s.center}>
-            <ActivityIndicator size="large" color={BRAND} />
+            <ActivityIndicator size="large" color={colors.brand} />
             <Text style={s.hint}>Loading…</Text>
           </View>
         ) : error ? (
@@ -137,14 +139,12 @@ export function PickerModal({
               if (!selectedId || !items.length) return;
               const idx = items.findIndex((i) => i.id === selectedId);
               if (idx > 0) {
-                // Small delay lets FlatList finish its initial render pass
                 setTimeout(() => {
                   listRef.current?.scrollToIndex({ index: idx, animated: false, viewPosition: 0.3 });
                 }, 300);
               }
             }}
             onScrollToIndexFailed={({ index, averageItemLength }) => {
-              // Fallback: use average item length to estimate offset, then retry
               listRef.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
               setTimeout(() => {
                 listRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 });
@@ -158,10 +158,8 @@ export function PickerModal({
                   onPress={() => handleSelect(item.id)}
                   activeOpacity={0.7}
                 >
-                  {/* Selection indicator — left accent bar */}
                   <View style={[s.accentBar, selected && s.accentBarActive]} />
 
-                  {/* Avatar thumbnail */}
                   {item.imageUrl ? (
                     <Image source={{ uri: item.imageUrl }} style={s.thumb} />
                   ) : null}
@@ -175,7 +173,6 @@ export function PickerModal({
                     ) : null}
                   </View>
 
-                  {/* Audio preview button */}
                   {item.previewUrl ? (
                     <TouchableOpacity
                       style={[s.actionBtn, selected && s.actionBtnSelected]}
@@ -188,7 +185,6 @@ export function PickerModal({
                     </TouchableOpacity>
                   ) : null}
 
-                  {/* Zoom preview button */}
                   {item.imageUrl ? (
                     <TouchableOpacity
                       style={[s.actionBtn, selected && s.actionBtnSelected]}
@@ -222,56 +218,51 @@ export function PickerModal({
   );
 }
 
-const BRAND = '#6366F1';
-const BG = '#0A0A0A';
-const CARD = '#141414';
-const BORDER = '#262626';
-
-const s = StyleSheet.create({
+const useStyles = createThemedStyles((c) => ({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: c.overlayLight,
   },
   sheet: {
-    backgroundColor: BG,
+    backgroundColor: c.bg,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
-    maxHeight: '60%',
+    maxHeight: '60%' as const,
     borderTopWidth: 1,
-    borderColor: BORDER,
+    borderColor: c.borderSubtle,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderColor: BORDER,
+    borderColor: c.borderSubtle,
   },
   title: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
+    fontWeight: '700' as const,
+    color: c.textPrimary,
   },
   done: {
     fontSize: 15,
-    color: BRAND,
-    fontWeight: '600',
+    color: c.brand,
+    fontWeight: '600' as const,
   },
   center: {
-    alignItems: 'center',
+    alignItems: 'center' as const,
     paddingVertical: 40,
   },
   hint: {
-    color: '#555',
+    color: c.textDisabled,
     marginTop: 12,
     fontSize: 14,
   },
   errorText: {
-    color: '#F87171',
+    color: c.errorText,
     fontSize: 14,
-    textAlign: 'center',
+    textAlign: 'center' as const,
     paddingHorizontal: 24,
   },
   retryBtn: {
@@ -279,11 +270,11 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 24,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: c.borderSubtle,
     borderRadius: 8,
   },
   retryText: {
-    color: '#888',
+    color: c.textFaint,
     fontSize: 14,
   },
   list: {
@@ -291,96 +282,96 @@ const s = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: BORDER,
+    backgroundColor: c.borderSubtle,
     marginHorizontal: 20,
   },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     paddingVertical: 14,
     paddingRight: 20,
     paddingLeft: 16,
-    backgroundColor: BG,
+    backgroundColor: c.bg,
   },
   rowSelected: {
-    backgroundColor: CARD,
+    backgroundColor: c.surface,
   },
   accentBar: {
     width: 3,
-    alignSelf: 'stretch',
+    alignSelf: 'stretch' as const,
     borderRadius: 2,
     marginRight: 12,
-    backgroundColor: 'transparent',
+    backgroundColor: c.transparent,
   },
   accentBarActive: {
-    backgroundColor: BRAND,
+    backgroundColor: c.brand,
   },
   thumb: {
     width: 44,
     height: 44,
     borderRadius: 22,
     marginRight: 12,
-    backgroundColor: CARD,
+    backgroundColor: c.surface,
   },
   rowText: {
     flex: 1,
   },
   rowLabel: {
     fontSize: 15,
-    color: '#ccc',
+    color: c.textSecondary,
   },
   rowLabelSelected: {
-    color: '#fff',
-    fontWeight: '600',
+    color: c.textPrimary,
+    fontWeight: '600' as const,
   },
   rowSublabel: {
     fontSize: 12,
-    color: '#555',
+    color: c.textDisabled,
     marginTop: 2,
   },
   rowSublabelSelected: {
-    color: '#888',
+    color: c.textFaint,
   },
   actionBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: CARD,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: c.borderSubtle,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     marginLeft: 8,
   },
   actionBtnSelected: {
-    borderColor: BRAND,
+    borderColor: c.brand,
   },
   playIcon: {
-    color: BRAND,
+    color: c.brand,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '900' as const,
   },
   zoomIcon: {
-    color: BRAND,
+    color: c.brand,
     fontSize: 20,
   },
   previewBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: c.overlayHeavy,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     padding: 32,
   },
   previewImage: {
-    width: '100%',
+    width: '100%' as const,
     aspectRatio: 1,
     borderRadius: 16,
   },
   previewCaption: {
-    color: '#fff',
+    color: c.textPrimary,
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '600' as const,
     marginTop: 16,
-    textAlign: 'center',
+    textAlign: 'center' as const,
   },
-});
+}));

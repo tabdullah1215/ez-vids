@@ -4,7 +4,6 @@ import {
   FlatList,
   Linking,
   RefreshControl,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -12,16 +11,8 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { api } from '@/src/api/client';
 import { AppHeader } from '@/src/components/AppHeader';
+import { createThemedStyles, useTheme } from '@/src/theme';
 import type { JobStatusAPIResponse } from '@/src/types/api';
-
-const BG     = '#0A0A0A';
-const CARD   = '#141414';
-const BORDER = '#4a4a4a';
-const BRAND  = '#6366F1';
-const TEXT   = '#FFFFFF';
-const MUTED  = '#6B7280';
-const GREEN  = '#22C55E';
-const RED    = '#EF4444';
 
 const ACTIVE_STATUSES = new Set(['pending', 'submitted', 'queued', 'rendering', 'created']);
 const POLL_MS = 15_000;
@@ -44,22 +35,24 @@ function formatElapsed(isoString: string, now: number): string {
 }
 
 function StatusIcon({ status }: { status: string }) {
+  const styles = useStyles();
+  const { colors } = useTheme();
+
   if (ACTIVE_STATUSES.has(status)) {
-    return <ActivityIndicator size="small" color={BRAND} />;
+    return <ActivityIndicator size="small" color={colors.brand} />;
   }
   if (status === 'completed') {
-    return <Text style={[styles.statusIcon, { color: GREEN }]}>✓</Text>;
+    return <Text style={[styles.statusIcon, { color: colors.success }]}>✓</Text>;
   }
-  return <Text style={[styles.statusIcon, { color: RED }]}>✗</Text>;
+  return <Text style={[styles.statusIcon, { color: colors.error }]}>✗</Text>;
 }
 
 function JobCard({ job, now }: { job: JobStatusAPIResponse; now: number }) {
+  const styles = useStyles();
   const scriptPreview = job.request?.scriptText?.slice(0, 60) || '(no script)';
   const isActive = ACTIVE_STATUSES.has(job.status);
   const orientation = job.request?.aspectRatio === '16:9' ? 'Landscape' : 'Portrait';
 
-  // Active jobs: show time since creation (processing duration)
-  // Finished jobs: show time since completion/update (how long ago it finished)
   const referenceTime = isActive
     ? job.createdAt
     : (job.completedAt ?? job.updatedAt);
@@ -99,6 +92,8 @@ function JobCard({ job, now }: { job: JobStatusAPIResponse; now: number }) {
 }
 
 export default function VideosScreen() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const [jobs, setJobs]         = useState<JobStatusAPIResponse[]>([]);
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -145,7 +140,6 @@ export default function VideosScreen() {
     }
   }, []);
 
-  // Start/stop the 5s poll based on whether any jobs are active
   useEffect(() => {
     const hasActive = jobs.some((j) => ACTIVE_STATUSES.has(j.status));
     if (hasActive && !pollRef.current) {
@@ -159,7 +153,6 @@ export default function VideosScreen() {
     };
   }, [jobs, fetchJobs]);
 
-  // Clock tick: 1s when active jobs (live timer), 30s when idle (keep "ago" fresh)
   useEffect(() => {
     const hasActive = jobs.some((j) => ACTIVE_STATUSES.has(j.status));
     const interval = hasActive ? 1000 : 30_000;
@@ -167,8 +160,6 @@ export default function VideosScreen() {
     return () => { if (clockRef.current) { clearInterval(clockRef.current); clockRef.current = null; } };
   }, [jobs]);
 
-  // Initial load + re-fetch whenever this tab gains focus
-  // (catches jobs submitted while on the Generate tab)
   useFocusEffect(
     useCallback(() => {
       fetchJobs();
@@ -183,7 +174,7 @@ export default function VideosScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={BRAND} />
+        <ActivityIndicator size="large" color={colors.brand} />
       </View>
     );
   }
@@ -220,7 +211,6 @@ export default function VideosScreen() {
         )}
       </AppHeader>
 
-      {/* Orientation filter (segment toggle) */}
       <View style={styles.segmentRow}>
         {(['all', '9:16', '16:9'] as OrientationFilter[]).map((f) => {
           const active = orientationFilter === f;
@@ -258,7 +248,7 @@ export default function VideosScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={BRAND}
+            tintColor={colors.brand}
           />
         }
         ListEmptyComponent={
@@ -273,17 +263,17 @@ export default function VideosScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((c) => ({
   container: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: c.bg,
     paddingTop: 56,
   },
   center: {
     flex: 1,
-    backgroundColor: BG,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: c.bg,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
 
   // ─── Header stats ───
@@ -298,12 +288,12 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
   },
   statValue: {
-    color: TEXT,
+    color: c.textPrimary,
     fontSize: 15,
     fontWeight: '700' as const,
   },
   statLabel: {
-    color: MUTED,
+    color: c.textSubdued,
     fontSize: 10,
     fontWeight: '600' as const,
     textTransform: 'uppercase' as const,
@@ -313,22 +303,22 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 24,
-    backgroundColor: BORDER,
+    backgroundColor: c.border,
   },
 
   // ─── Segment toggle (orientation filter) ───
   segmentRow: {
-    flexDirection: 'row', marginHorizontal: 20, marginTop: 16, marginBottom: 12,
-    backgroundColor: CARD, borderRadius: 10, padding: 3,
-    borderWidth: 1, borderColor: BORDER,
+    flexDirection: 'row' as const, marginHorizontal: 20, marginTop: 16, marginBottom: 12,
+    backgroundColor: c.surface, borderRadius: 10, padding: 3,
+    borderWidth: 1, borderColor: c.border,
   },
   segmentBtn: {
     flex: 1, paddingVertical: 10, borderRadius: 8,
-    alignItems: 'center',
+    alignItems: 'center' as const,
   },
-  segmentBtnActive: { backgroundColor: BRAND },
-  segmentText: { color: '#aaa', fontSize: 16, fontWeight: '600' },
-  segmentTextActive: { color: '#fff' },
+  segmentBtnActive: { backgroundColor: c.brand },
+  segmentText: { color: c.textInactive, fontSize: 16, fontWeight: '600' as const },
+  segmentTextActive: { color: c.textPrimary },
 
   // ─── List ───
   listContent: {
@@ -337,29 +327,29 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   emptyText: {
-    color: MUTED,
+    color: c.textSubdued,
     fontSize: 15,
-    textAlign: 'center',
+    textAlign: 'center' as const,
     lineHeight: 24,
   },
 
   // ─── Cards ───
   card: {
-    backgroundColor: CARD,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: c.border,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     gap: 10,
   },
   cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 12,
   },
   cardMeta: {
@@ -368,69 +358,69 @@ const styles = StyleSheet.create({
   statusIcon: {
     fontSize: 18,
     width: 20,
-    textAlign: 'center',
+    textAlign: 'center' as const,
   },
   statusText: {
-    color: TEXT,
+    color: c.textPrimary,
     fontSize: 14,
-    fontWeight: '600',
-    textTransform: 'capitalize',
+    fontWeight: '600' as const,
+    textTransform: 'capitalize' as const,
   },
   elapsed: {
-    color: MUTED,
+    color: c.textSubdued,
     fontSize: 12,
     marginTop: 2,
   },
   orientationBadge: {
-    color: MUTED,
+    color: c.textSubdued,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '600' as const,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: c.border,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    overflow: 'hidden',
+    overflow: 'hidden' as const,
   },
   script: {
-    color: MUTED,
+    color: c.textSubdued,
     fontSize: 13,
     lineHeight: 18,
   },
   hint: {
-    color: BRAND,
+    color: c.brand,
     fontSize: 12,
   },
   openBtn: {
-    backgroundColor: BRAND,
+    backgroundColor: c.brand,
     borderRadius: 8,
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: 'center' as const,
   },
   openBtnText: {
-    color: TEXT,
+    color: c.textPrimary,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '600' as const,
   },
   errorText: {
-    color: RED,
+    color: c.error,
     fontSize: 12,
     lineHeight: 16,
   },
   errorBox: {
     marginHorizontal: 16,
     marginBottom: 12,
-    backgroundColor: '#1A0A0A',
+    backgroundColor: c.surfaceErrorTint,
     borderWidth: 1,
-    borderColor: RED,
+    borderColor: c.error,
     borderRadius: 8,
     padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: 12,
   },
   errorBoxText: {
-    color: RED,
+    color: c.error,
     fontSize: 13,
     flex: 1,
   },
@@ -439,10 +429,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: RED,
+    borderColor: c.error,
   },
   retryBtnText: {
-    color: RED,
+    color: c.error,
     fontSize: 13,
   },
-});
+}));

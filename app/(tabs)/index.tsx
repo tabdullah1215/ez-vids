@@ -24,6 +24,7 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withSequence, withTiming,
 } from 'react-native-reanimated';
 import { AppHeader } from '@/src/components/AppHeader';
+import { createThemedStyles, useTheme } from '@/src/theme';
 import type { PickerItem } from '@/src/components/PickerModal';
 
 // ─── Visual Styles (from Creatify lipsyncs_v2 API) ───────────
@@ -53,6 +54,9 @@ const STEP_COUNT = STEPS.length;
 
 // ─── Main Component ─────────────────────────────────────────
 export default function GenerateScreen() {
+  const s = useStyles();
+  const { colors } = useTheme();
+
   // --- Wizard step ---
   const [step, setStep] = useState(0);
   const directionRef = useRef<'forward' | 'back'>('forward');
@@ -418,7 +422,7 @@ export default function GenerateScreen() {
     if (loading) {
       return (
         <View style={s.listCenter}>
-          <ActivityIndicator size="large" color={BRAND} />
+          <ActivityIndicator size="large" color={colors.brand} />
           <Text style={s.listHint}>Loading...</Text>
         </View>
       );
@@ -483,7 +487,7 @@ export default function GenerateScreen() {
                 multiline
                 numberOfLines={6}
                 placeholder={EZVIDS_DEFAULTS.scriptText}
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.textDisabled}
                 value={scriptText}
                 onChangeText={setScriptText}
               />
@@ -494,8 +498,8 @@ export default function GenerateScreen() {
                 <Switch
                   value={testMode}
                   onValueChange={setTestMode}
-                  trackColor={{ false: '#333', true: BRAND }}
-                  thumbColor={testMode ? '#fff' : '#888'}
+                  trackColor={{ false: colors.switchTrackOff, true: colors.brand }}
+                  thumbColor={testMode ? colors.textPrimary : colors.textFaint}
                 />
               </View>
               {testMode && (
@@ -602,7 +606,7 @@ export default function GenerateScreen() {
                 activeOpacity={0.7}
               >
                 {uploadingImage ? (
-                  <ActivityIndicator size="small" color={BRAND} />
+                  <ActivityIndicator size="small" color={colors.brand} />
                 ) : (
                   <Text style={s.uploadBtnText}>Choose from Camera Roll</Text>
                 )}
@@ -644,7 +648,7 @@ export default function GenerateScreen() {
               <TextInput
                 style={s.input}
                 placeholder="https://..."
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.textDisabled}
                 value={productImageUrl}
                 onChangeText={(text) => {
                   setProductImageUrl(text);
@@ -741,7 +745,7 @@ export default function GenerateScreen() {
       {/* ═══ LOADING ═══ */}
       {showLoading && (
         <View style={s.center}>
-          <ActivityIndicator size="large" color={BRAND} />
+          <ActivityIndicator size="large" color={colors.brand} />
           <Text style={s.statusTitle}>
             {job.phase === 'submitting' ? 'Submitting...' : 'Creating your video...'}
           </Text>
@@ -800,71 +804,62 @@ export default function GenerateScreen() {
   );
 }
 
-// ═════════════════════════════════════════════════════════════
-// Styles
-// ═════════════════════════════════════════════════════════════
-
-const BRAND = '#6366F1';
-const BG = '#0A0A0A';
-const CARD = '#141414';
-const BORDER = '#4a4a4a';
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG, paddingTop: 56 },
+const useStyles = createThemedStyles((c) => ({
+  container: { flex: 1, backgroundColor: c.bg, paddingTop: 56 },
 
   // ─── Wizard header extras ───
   stepTitle: {
-    fontSize: 19, color: BRAND, fontWeight: '400',
-    textAlign: 'center',
-    backgroundColor: '#fff',
+    fontSize: 19, color: c.brand, fontWeight: '400' as const,
+    textAlign: 'center' as const,
+    backgroundColor: c.textPrimary,
     paddingHorizontal: 16,
     paddingVertical: 3,
     borderRadius: 20,
-    overflow: 'hidden',
+    overflow: 'hidden' as const,
   },
   stepsRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
     marginTop: 6,
   },
   stepCircle: {
     width: 28, height: 28, borderRadius: 14,
-    borderWidth: 2, borderColor: '#999',
-    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: c.textMuted,
+    alignItems: 'center' as const, justifyContent: 'center' as const,
   },
   stepCircleActive: {
-    borderColor: BRAND, backgroundColor: BRAND,
+    borderColor: c.brand, backgroundColor: c.brand,
   },
   stepCircleDone: {
-    borderColor: BRAND,
+    borderColor: c.brand,
   },
   stepNum: {
-    fontSize: 14, fontWeight: '700', color: '#999',
+    fontSize: 14, fontWeight: '700' as const, color: c.textMuted,
   },
   stepNumActive: {
-    color: '#fff',
-    textShadowColor: '#6366f1',
+    color: c.textPrimary,
+    textShadowColor: c.brand,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 6,
   },
   stepLine: {
-    width: 24, height: 2, backgroundColor: '#999',
+    width: 24, height: 2, backgroundColor: c.textMuted,
   },
-  stepLineDone: { backgroundColor: BRAND },
+  stepLineDone: { backgroundColor: c.brand },
 
   // ─── Step content ───
   stepContent: { flex: 1 },
   stepScroll: { paddingTop: 16, paddingHorizontal: 20, paddingBottom: 20 },
   stepFlex: { flex: 1 },
   stepHint: {
-    color: '#999', fontSize: 15, marginBottom: 16,
-    textAlign: 'center',
+    color: c.textMuted, fontSize: 15, marginBottom: 16,
+    textAlign: 'center' as const,
   },
 
   // ─── Segment toggle ───
   segmentRow: {
-    flexDirection: 'row', marginHorizontal: 20, marginTop: 16, marginBottom: 12,
-    backgroundColor: CARD, borderRadius: 10, padding: 3,
-    borderWidth: 1, borderColor: BORDER,
+    flexDirection: 'row' as const, marginHorizontal: 20, marginTop: 16, marginBottom: 12,
+    backgroundColor: c.surface, borderRadius: 10, padding: 3,
+    borderWidth: 1, borderColor: c.border,
   },
   segmentBtn: {
     flex: 1, borderRadius: 8,
@@ -874,207 +869,207 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center' as const,
   },
-  segmentBtnActive: { backgroundColor: BRAND },
+  segmentBtnActive: { backgroundColor: c.brand },
   flashOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#EF4444',
+    backgroundColor: c.error,
     borderRadius: 8,
   },
-  segmentText: { color: '#aaa', fontSize: 16, fontWeight: '600' },
-  segmentTextActive: { color: '#fff' },
+  segmentText: { color: c.textInactive, fontSize: 16, fontWeight: '600' as const },
+  segmentTextActive: { color: c.textPrimary },
 
   // ─── Selection summary ───
   selectionSummary: {
-    flexDirection: 'row', gap: 16, justifyContent: 'center',
+    flexDirection: 'row' as const, gap: 16, justifyContent: 'center' as const,
     paddingHorizontal: 20, paddingBottom: 8,
   },
-  selectionText: { color: '#bbb', fontSize: 14 },
+  selectionText: { color: c.textTertiary, fontSize: 14 },
 
   // ─── Lists ───
   listPad: { paddingBottom: 8 },
-  listCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  listHint: { color: '#999', marginTop: 12, fontSize: 16 },
-  separator: { height: 1, backgroundColor: BORDER, marginHorizontal: 20 },
+  listCenter: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, padding: 40 },
+  listHint: { color: c.textMuted, marginTop: 12, fontSize: 16 },
+  separator: { height: 1, backgroundColor: c.border, marginHorizontal: 20 },
 
   // ─── List rows (shared with avatar + voice) ───
   row: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row' as const, alignItems: 'center' as const,
     paddingVertical: 14, paddingRight: 20, paddingLeft: 16,
-    backgroundColor: BG,
+    backgroundColor: c.bg,
   },
-  rowSelected: { backgroundColor: CARD },
+  rowSelected: { backgroundColor: c.surface },
   accentBar: {
-    width: 3, alignSelf: 'stretch', borderRadius: 2,
-    marginRight: 12, backgroundColor: 'transparent',
+    width: 3, alignSelf: 'stretch' as const, borderRadius: 2,
+    marginRight: 12, backgroundColor: c.transparent,
   },
-  accentBarActive: { backgroundColor: BRAND },
+  accentBarActive: { backgroundColor: c.brand },
   thumb: {
     width: 44, height: 44, borderRadius: 22,
-    marginRight: 12, backgroundColor: CARD,
+    marginRight: 12, backgroundColor: c.surface,
   },
   rowText: { flex: 1 },
-  rowLabel: { fontSize: 17, color: '#e0e0e0' },
-  rowLabelSelected: { color: '#fff', fontWeight: '600' },
-  rowSublabel: { fontSize: 14, color: '#999', marginTop: 2 },
-  rowSublabelSelected: { color: '#bbb' },
+  rowLabel: { fontSize: 17, color: c.textSecondary },
+  rowLabelSelected: { color: c.textPrimary, fontWeight: '600' as const },
+  rowSublabel: { fontSize: 14, color: c.textMuted, marginTop: 2 },
+  rowSublabelSelected: { color: c.textTertiary },
   actionBtn: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center', marginLeft: 8,
+    backgroundColor: c.surface, borderWidth: 1, borderColor: c.border,
+    alignItems: 'center' as const, justifyContent: 'center' as const, marginLeft: 8,
   },
-  actionBtnSelected: { borderColor: BRAND },
-  playIcon: { color: BRAND, fontSize: 18, fontWeight: '900' },
-  zoomIcon: { color: BRAND, fontSize: 20 },
+  actionBtnSelected: { borderColor: c.brand },
+  playIcon: { color: c.brand, fontSize: 18, fontWeight: '900' as const },
+  zoomIcon: { color: c.brand, fontSize: 20 },
 
   // ─── Aspect ratio toggle ───
   ratioRow: {
-    flexDirection: 'row', justifyContent: 'center', gap: 12,
+    flexDirection: 'row' as const, justifyContent: 'center' as const, gap: 12,
     marginHorizontal: 20, marginTop: 16, marginBottom: 14,
   },
   ratioBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8,
     paddingVertical: 10, paddingHorizontal: 20,
-    borderRadius: 10, borderWidth: 1, borderColor: BORDER,
-    backgroundColor: CARD,
+    borderRadius: 10, borderWidth: 1, borderColor: c.border,
+    backgroundColor: c.surface,
   },
-  ratioBtnActive: { borderColor: BRAND, backgroundColor: '#1a1a2e' },
+  ratioBtnActive: { borderColor: c.brand, backgroundColor: c.surfaceBrandTint },
   ratioIcon: {
-    borderRadius: 3, borderWidth: 2, borderColor: '#666',
+    borderRadius: 3, borderWidth: 2, borderColor: c.borderMuted,
   },
-  ratioIconActive: { borderColor: BRAND },
+  ratioIconActive: { borderColor: c.brand },
   ratioPortrait: { width: 14, height: 22 },
   ratioLandscape: { width: 22, height: 14 },
-  ratioLabel: { color: '#999', fontSize: 15, fontWeight: '600' },
-  ratioLabelActive: { color: '#fff' },
+  ratioLabel: { color: c.textMuted, fontSize: 15, fontWeight: '600' as const },
+  ratioLabelActive: { color: c.textPrimary },
 
   // ─── Template grid ───
   templateRow: { gap: 12, paddingHorizontal: 16, marginBottom: 12 },
   templateCard: {
-    flex: 1, backgroundColor: CARD, borderRadius: 12,
-    borderWidth: 1, borderColor: BORDER, overflow: 'hidden',
+    flex: 1, backgroundColor: c.surface, borderRadius: 12,
+    borderWidth: 1, borderColor: c.border, overflow: 'hidden' as const,
   },
-  templateCardSelected: { borderColor: BRAND, borderWidth: 2 },
+  templateCardSelected: { borderColor: c.brand, borderWidth: 2 },
   templateThumb: {
-    width: '100%', aspectRatio: 1,
-    backgroundColor: '#1a1a1a',
+    width: '100%' as const, aspectRatio: 1,
+    backgroundColor: c.surfaceAlt,
   },
   templateName: {
-    color: '#e0e0e0', fontSize: 15, fontWeight: '600',
+    color: c.textSecondary, fontSize: 15, fontWeight: '600' as const,
     paddingHorizontal: 10, paddingTop: 8,
   },
-  templateNameSelected: { color: '#fff' },
+  templateNameSelected: { color: c.textPrimary },
   templateDesc: {
-    color: '#999', fontSize: 13, lineHeight: 17,
+    color: c.textMuted, fontSize: 13, lineHeight: 17,
     paddingHorizontal: 10, paddingTop: 4, paddingBottom: 10,
   },
 
   // ─── Form inputs ───
   input: {
-    backgroundColor: CARD, borderRadius: 10, padding: 14,
-    color: '#fff', fontSize: 17, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: c.surface, borderRadius: 10, padding: 14,
+    color: c.textPrimary, fontSize: 17, borderWidth: 1, borderColor: c.border,
   },
   textArea: {
-    backgroundColor: CARD, borderRadius: 10, padding: 14,
-    color: '#fff', fontSize: 17, borderWidth: 1, borderColor: BORDER,
-    minHeight: 140, textAlignVertical: 'top',
+    backgroundColor: c.surface, borderRadius: 10, padding: 14,
+    color: c.textPrimary, fontSize: 17, borderWidth: 1, borderColor: c.border,
+    minHeight: 140, textAlignVertical: 'top' as const,
   },
 
   // ─── Test mode ───
   testRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const,
     marginTop: 24, paddingVertical: 8,
   },
-  testLabel: { color: '#888', fontSize: 15 },
+  testLabel: { color: c.textFaint, fontSize: 15 },
   testHint: {
-    color: '#666', fontSize: 13, marginTop: 4, fontStyle: 'italic',
+    color: c.textDisabled, fontSize: 13, marginTop: 4, fontStyle: 'italic' as const,
   },
 
   // ─── Product upload ───
   uploadBtn: {
-    backgroundColor: CARD, borderRadius: 12,
-    borderWidth: 1, borderColor: BRAND, borderStyle: 'dashed' as const,
-    paddingVertical: 16, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: c.surface, borderRadius: 12,
+    borderWidth: 1, borderColor: c.brand, borderStyle: 'dashed' as const,
+    paddingVertical: 16, alignItems: 'center' as const, justifyContent: 'center' as const,
     marginBottom: 12,
   },
-  uploadBtnText: { color: BRAND, fontSize: 17, fontWeight: '600' },
+  uploadBtnText: { color: c.brand, fontSize: 17, fontWeight: '600' as const },
   uploadError: {
-    color: '#F87171', fontSize: 14, textAlign: 'center', marginBottom: 8,
+    color: c.errorText, fontSize: 14, textAlign: 'center' as const, marginBottom: 8,
   },
-  previewContainer: { alignItems: 'center', marginBottom: 12 },
+  previewContainer: { alignItems: 'center' as const, marginBottom: 12 },
   productPreview: {
     width: 160, height: 160, borderRadius: 12,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: c.surface, borderWidth: 1, borderColor: c.border,
   },
   removeBtn: {
     marginTop: 8, paddingVertical: 6, paddingHorizontal: 16,
-    borderRadius: 8, borderWidth: 1, borderColor: '#666',
+    borderRadius: 8, borderWidth: 1, borderColor: c.borderMuted,
   },
-  removeBtnText: { color: '#999', fontSize: 14 },
+  removeBtnText: { color: c.textMuted, fontSize: 14 },
   dividerRow: {
-    flexDirection: 'row', alignItems: 'center', marginVertical: 16,
+    flexDirection: 'row' as const, alignItems: 'center' as const, marginVertical: 16,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: BORDER },
+  dividerLine: { flex: 1, height: 1, backgroundColor: c.border },
   dividerText: {
-    color: '#666', fontSize: 14, fontWeight: '600', marginHorizontal: 12,
+    color: c.textDisabled, fontSize: 14, fontWeight: '600' as const, marginHorizontal: 12,
   },
 
   // ─── Footer nav ───
   footer: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingHorizontal: 20,
-    paddingVertical: 16, borderTopWidth: 1, borderColor: BORDER,
+    flexDirection: 'row' as const, justifyContent: 'space-between' as const,
+    alignItems: 'center' as const, paddingHorizontal: 20,
+    paddingVertical: 16, borderTopWidth: 1, borderColor: c.border,
   },
   backBtn: {
     paddingVertical: 12, paddingHorizontal: 28,
-    borderWidth: 1, borderColor: '#666', borderRadius: 12,
+    borderWidth: 1, borderColor: c.borderMuted, borderRadius: 12,
   },
-  backBtnText: { color: '#bbb', fontSize: 17, fontWeight: '600' },
+  backBtnText: { color: c.textTertiary, fontSize: 17, fontWeight: '600' as const },
   nextBtn: {
-    backgroundColor: BRAND, borderRadius: 12,
+    backgroundColor: c.brand, borderRadius: 12,
     paddingVertical: 12, paddingHorizontal: 28,
   },
-  nextBtnText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  nextBtnText: { color: c.textPrimary, fontSize: 17, fontWeight: '600' as const },
   generateBtn: {
-    backgroundColor: BRAND, borderRadius: 12,
+    backgroundColor: c.brand, borderRadius: 12,
     paddingVertical: 12, paddingHorizontal: 24,
   },
-  generateBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  generateBtnText: { color: c.textPrimary, fontSize: 18, fontWeight: '700' as const },
 
   // ─── Loading / Success / Error ───
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  center: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, padding: 20 },
   bigEmoji: { fontSize: 56, marginBottom: 8 },
-  statusTitle: { fontSize: 24, fontWeight: '700', color: '#fff', marginTop: 16 },
-  statusLabel: { fontSize: 16, color: '#bbb', marginTop: 8 },
-  statusHint: { fontSize: 15, color: '#999', marginTop: 16, textAlign: 'center' },
-  elapsed: { fontSize: 40, fontWeight: '200', color: BRAND, marginTop: 16 },
-  mono: { fontSize: 13, color: '#888', marginTop: 20, fontFamily: 'monospace' },
+  statusTitle: { fontSize: 24, fontWeight: '700' as const, color: c.textPrimary, marginTop: 16 },
+  statusLabel: { fontSize: 16, color: c.textTertiary, marginTop: 8 },
+  statusHint: { fontSize: 15, color: c.textMuted, marginTop: 16, textAlign: 'center' as const },
+  elapsed: { fontSize: 40, fontWeight: '200' as const, color: c.brand, marginTop: 16 },
+  mono: { fontSize: 13, color: c.textFaint, marginTop: 20, fontFamily: 'monospace' },
   primaryBtn: {
-    backgroundColor: BRAND, borderRadius: 14,
+    backgroundColor: c.brand, borderRadius: 14,
     paddingVertical: 14, paddingHorizontal: 36, marginTop: 24,
   },
-  primaryBtnText: { color: '#fff', fontSize: 19, fontWeight: '600' },
+  primaryBtnText: { color: c.textPrimary, fontSize: 19, fontWeight: '600' as const },
   secondaryBtn: {
-    borderWidth: 1, borderColor: '#666', borderRadius: 10,
+    borderWidth: 1, borderColor: c.borderMuted, borderRadius: 10,
     paddingVertical: 12, paddingHorizontal: 28, marginTop: 20,
   },
-  secondaryBtnText: { color: '#bbb', fontSize: 17 },
+  secondaryBtnText: { color: c.textTertiary, fontSize: 17 },
   urlText: {
-    fontSize: 13, color: '#888', marginTop: 12,
-    textAlign: 'center', paddingHorizontal: 24,
+    fontSize: 13, color: c.textFaint, marginTop: 12,
+    textAlign: 'center' as const, paddingHorizontal: 24,
   },
   errorText: {
-    color: '#F87171', fontSize: 16, marginTop: 12,
-    textAlign: 'center', paddingHorizontal: 24, lineHeight: 22,
+    color: c.errorText, fontSize: 16, marginTop: 12,
+    textAlign: 'center' as const, paddingHorizontal: 24, lineHeight: 22,
   },
 
   // ─── Zoom preview ───
   previewBackdrop: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
-    alignItems: 'center', justifyContent: 'center', padding: 32,
+    flex: 1, backgroundColor: c.overlayHeavy,
+    alignItems: 'center' as const, justifyContent: 'center' as const, padding: 32,
   },
-  previewImage: { width: '100%', aspectRatio: 1, borderRadius: 16 },
+  previewImage: { width: '100%' as const, aspectRatio: 1, borderRadius: 16 },
   previewCaption: {
-    color: '#fff', fontSize: 18, fontWeight: '600',
-    marginTop: 16, textAlign: 'center',
+    color: c.textPrimary, fontSize: 18, fontWeight: '600' as const,
+    marginTop: 16, textAlign: 'center' as const,
   },
-});
+}));
