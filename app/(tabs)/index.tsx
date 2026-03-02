@@ -76,6 +76,7 @@ export default function GenerateScreen() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [pickedImageUri, setPickedImageUri] = useState<string | null>(null);
   const [highlightedStyleId, setHighlightedStyleId] = useState<string | null>(null);
+  const [productFlash, setProductFlash] = useState(false);
 
   // --- Segment toggle for step 1 ---
   const [avatarSegment, setAvatarSegment] = useState<'avatar' | 'voice'>('avatar');
@@ -279,6 +280,15 @@ export default function GenerateScreen() {
       }
     }
   };
+
+  const flashProductInputs = useCallback(() => {
+    let count = 0;
+    const id = setInterval(() => {
+      setProductFlash((v) => !v);
+      count++;
+      if (count >= 4) { clearInterval(id); setProductFlash(false); }
+    }, 120);
+  }, []);
 
   const flashStyleTiles = useCallback(() => {
     const visibleIds = VISUAL_STYLES
@@ -621,7 +631,7 @@ export default function GenerateScreen() {
 
               {/* Upload button */}
               <TouchableOpacity
-                style={s.uploadBtn}
+                style={[s.uploadBtn, productFlash && s.uploadBtnFlash]}
                 onPress={handlePickImage}
                 disabled={uploadingImage}
                 activeOpacity={0.7}
@@ -667,7 +677,7 @@ export default function GenerateScreen() {
 
               {/* URL input */}
               <TextInput
-                style={s.input}
+                style={[s.input, productFlash && s.inputFlash]}
                 placeholder="https://..."
                 placeholderTextColor={colors.textDisabled}
                 value={productImageUrl}
@@ -732,6 +742,10 @@ export default function GenerateScreen() {
 
             {step < STEP_COUNT - 1 ? (
               <TouchableOpacity style={s.nextBtn} onPress={() => {
+                if (step === 2 && !productImageUrl.trim()) {
+                  flashProductInputs();
+                  return;
+                }
                 if (step === 1) {
                   const needAvatar = !avatarId;
                   const needVoice = !voiceId;
@@ -990,6 +1004,7 @@ const useStyles = createThemedStyles((c) => ({
     backgroundColor: c.surface, borderRadius: 10, padding: 14,
     color: c.textPrimary, fontSize: 17, borderWidth: 1, borderColor: c.border,
   },
+  inputFlash: { borderColor: c.brand },
   textArea: {
     backgroundColor: c.surface, borderRadius: 10, padding: 14,
     color: c.textPrimary, fontSize: 17, borderWidth: 1, borderColor: c.border,
@@ -1013,6 +1028,7 @@ const useStyles = createThemedStyles((c) => ({
     paddingVertical: 16, alignItems: 'center' as const, justifyContent: 'center' as const,
     marginBottom: 12,
   },
+  uploadBtnFlash: { borderColor: c.brand, borderStyle: 'solid' as const },
   uploadBtnText: { color: c.brand, fontSize: 17, fontWeight: '600' as const },
   uploadError: {
     color: c.errorText, fontSize: 14, textAlign: 'center' as const, marginBottom: 8,
