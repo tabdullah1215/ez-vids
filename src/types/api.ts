@@ -28,7 +28,7 @@ export interface JobStatusAPIResponse {
   thumbnailUrl?: string;
   creditsUsed?: number;
   errorMessage?: string;
-  request?: { scriptText?: string };
+  request?: { scriptText?: string; aspectRatio?: '9:16' | '1:1' | '16:9' };
   createdAt: string;
   updatedAt: string;
   completedAt?: string;

@@ -19,6 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useVideoJob } from '@/src/hooks/useVideoJob';
 import { EZVIDS_DEFAULTS } from '@/src/config/defaults';
 import { api } from '@/src/api/client';
+import { AppHeader } from '@/src/components/AppHeader';
 import type { PickerItem } from '@/src/components/PickerModal';
 
 // ─── Visual Styles (from Creatify lipsyncs_v2 API) ───────────
@@ -46,26 +47,6 @@ const VISUAL_STYLES = [
 const STEPS = ['voice over', 'avatar', 'product', 'style'] as const;
 const STEP_COUNT = STEPS.length;
 
-// ─── Header ─────────────────────────────────────────────────
-function AppHeader({ step, wizardActive }: { step: number; wizardActive: boolean }) {
-  return (
-    <View style={s.header}>
-      <Text style={s.logo}>EZ Vids</Text>
-      {wizardActive && (
-        <>
-          <Text style={s.subtitle}>GENERATE VIDEO</Text>
-          <Text style={s.stepTitle}>{'· ' + STEPS[step] + ' ·'}</Text>
-          <View style={s.dots}>
-            {STEPS.map((_, i) => (
-              <View key={i} style={[s.dot, i <= step && s.dotActive]} />
-            ))}
-          </View>
-        </>
-      )}
-    </View>
-  );
-}
-
 // ─── Main Component ─────────────────────────────────────────
 export default function GenerateScreen() {
   // --- Wizard step ---
@@ -81,7 +62,7 @@ export default function GenerateScreen() {
   const [productImageUrl, setProductImageUrl] = useState('');
   const [visualStyle, setVisualStyle] = useState('');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
-  const [testMode, setTestMode] = useState(false);
+  const [testMode, setTestMode] = useState(true);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [pickedImageUri, setPickedImageUri] = useState<string | null>(null);
@@ -446,7 +427,29 @@ export default function GenerateScreen() {
   return (
     <View style={s.container}>
       {/* ─── Header (always visible) ─── */}
-      <AppHeader step={step} wizardActive={showWizard} />
+      <AppHeader subtitle={showWizard ? 'GENERATE VIDEO' : undefined}>
+        {showWizard && (
+          <>
+            <Text style={s.stepTitle}>{'· ' + STEPS[step] + ' ·'}</Text>
+            <View style={s.stepsRow}>
+              {STEPS.map((_, i) => {
+                const done = i < step;
+                const active = i === step;
+                return (
+                  <React.Fragment key={i}>
+                    {i > 0 && <View style={[s.stepLine, (done || active) && s.stepLineDone]} />}
+                    <View style={[s.stepCircle, active && s.stepCircleActive, done && s.stepCircleDone]}>
+                      <Text style={[s.stepNum, (active || done) && s.stepNumActive]}>
+                        {i + 1}
+                      </Text>
+                    </View>
+                  </React.Fragment>
+                );
+              })}
+            </View>
+          </>
+        )}
+      </AppHeader>
 
       {/* ═══ WIZARD STEPS ═══ */}
       {showWizard && (
@@ -713,7 +716,7 @@ export default function GenerateScreen() {
           <Text style={s.statusTitle}>Something Went Wrong</Text>
           <Text style={s.errorText}>{job.error}</Text>
           <TouchableOpacity style={s.secondaryBtn} onPress={handleMakeAnother}>
-            <Text style={s.secondaryBtnText}>Try Again</Text>
+            <Text style={s.secondaryBtnText}>Make Another</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -747,30 +750,38 @@ const BORDER = '#4a4a4a';
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG, paddingTop: 56 },
 
-  // ─── Header ───
-  header: { alignItems: 'center', paddingBottom: 16 },
-  logo: {
-    fontSize: 32, fontWeight: '800', color: '#fff',
-    textAlign: 'center', letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 13, color: '#666', fontWeight: '600',
-    letterSpacing: 3, textAlign: 'center', marginTop: 6,
-  },
+  // ─── Wizard header extras ───
   stepTitle: {
     fontSize: 19, color: BRAND, fontWeight: '400',
-    textAlign: 'center', marginTop: 4,
+    textAlign: 'center',
   },
-  dots: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  dot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: '#666',
+  stepsRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    marginTop: 6,
   },
-  dotActive: { backgroundColor: BRAND },
+  stepCircle: {
+    width: 28, height: 28, borderRadius: 14,
+    borderWidth: 2, borderColor: '#444',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stepCircleActive: {
+    borderColor: BRAND, backgroundColor: BRAND,
+  },
+  stepCircleDone: {
+    borderColor: BRAND,
+  },
+  stepNum: {
+    fontSize: 14, fontWeight: '700', color: '#555',
+  },
+  stepNumActive: { color: '#fff' },
+  stepLine: {
+    width: 24, height: 2, backgroundColor: '#444',
+  },
+  stepLineDone: { backgroundColor: BRAND },
 
   // ─── Step content ───
   stepContent: { flex: 1 },
-  stepScroll: { padding: 20, paddingBottom: 20 },
+  stepScroll: { paddingTop: 16, paddingHorizontal: 20, paddingBottom: 20 },
   stepFlex: { flex: 1 },
   stepHint: {
     color: '#999', fontSize: 15, marginBottom: 16,
@@ -779,7 +790,7 @@ const s = StyleSheet.create({
 
   // ─── Segment toggle ───
   segmentRow: {
-    flexDirection: 'row', marginHorizontal: 20, marginBottom: 12,
+    flexDirection: 'row', marginHorizontal: 20, marginTop: 16, marginBottom: 12,
     backgroundColor: CARD, borderRadius: 10, padding: 3,
     borderWidth: 1, borderColor: BORDER,
   },
@@ -837,7 +848,7 @@ const s = StyleSheet.create({
   // ─── Aspect ratio toggle ───
   ratioRow: {
     flexDirection: 'row', justifyContent: 'center', gap: 12,
-    marginHorizontal: 20, marginBottom: 14,
+    marginHorizontal: 20, marginTop: 16, marginBottom: 14,
   },
   ratioBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

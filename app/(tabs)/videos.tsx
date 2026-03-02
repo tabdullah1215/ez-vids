@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { api } from '@/src/api/client';
+import { AppHeader } from '@/src/components/AppHeader';
 import type { JobStatusAPIResponse } from '@/src/types/api';
 
 const BG     = '#0A0A0A';
@@ -24,6 +25,8 @@ const RED    = '#EF4444';
 
 const ACTIVE_STATUSES = new Set(['pending', 'submitted', 'queued', 'rendering', 'created']);
 const POLL_MS = 15_000;
+
+type OrientationFilter = 'all' | '9:16' | '16:9';
 
 function formatElapsed(isoString: string, now: number): string {
   const diffSec = Math.floor((now - new Date(isoString).getTime()) / 1000);
@@ -53,6 +56,7 @@ function StatusIcon({ status }: { status: string }) {
 function JobCard({ job, now }: { job: JobStatusAPIResponse; now: number }) {
   const scriptPreview = job.request?.scriptText?.slice(0, 60) || '(no script)';
   const isActive = ACTIVE_STATUSES.has(job.status);
+  const orientation = job.request?.aspectRatio === '16:9' ? 'Landscape' : 'Portrait';
 
   // Active jobs: show time since creation (processing duration)
   // Finished jobs: show time since completion/update (how long ago it finished)
@@ -68,6 +72,7 @@ function JobCard({ job, now }: { job: JobStatusAPIResponse; now: number }) {
           <Text style={styles.statusText}>{job.status}</Text>
           <Text style={styles.elapsed}>{formatElapsed(referenceTime, now)}</Text>
         </View>
+        <Text style={styles.orientationBadge}>{orientation}</Text>
       </View>
 
       <Text style={styles.script} numberOfLines={2}>{scriptPreview}</Text>
@@ -99,8 +104,17 @@ export default function VideosScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError]       = useState<string | null>(null);
   const [now, setNow]           = useState(Date.now());
+  const [orientationFilter, setOrientationFilter] = useState<OrientationFilter>('all');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const filteredJobs = useMemo(() => {
+    if (orientationFilter === 'all') return jobs;
+    return jobs.filter((j) => {
+      const ratio = j.request?.aspectRatio ?? '9:16';
+      return ratio === orientationFilter;
+    });
+  }, [jobs, orientationFilter]);
 
   const fetchJobs = useCallback(async (silent = false) => {
     if (!silent) setError(null);
@@ -160,7 +174,26 @@ export default function VideosScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>My Videos</Text>
+      <AppHeader subtitle="MY VIDEOS" />
+
+      {/* Orientation filter (segment toggle) */}
+      <View style={styles.segmentRow}>
+        {(['all', '9:16', '16:9'] as OrientationFilter[]).map((f) => {
+          const active = orientationFilter === f;
+          const label = f === 'all' ? 'All' : f === '9:16' ? 'Portrait' : 'Landscape';
+          return (
+            <TouchableOpacity
+              key={f}
+              style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+              onPress={() => setOrientationFilter(f)}
+            >
+              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       {error && (
         <View style={styles.errorBox}>
@@ -172,11 +205,11 @@ export default function VideosScreen() {
       )}
 
       <FlatList
-        data={jobs}
+        data={filteredJobs}
         keyExtractor={(j) => j.jobId}
         extraData={now}
         renderItem={({ item }) => <JobCard job={item} now={now} />}
-        contentContainerStyle={jobs.length === 0 ? styles.emptyContainer : styles.listContent}
+        contentContainerStyle={filteredJobs.length === 0 ? styles.emptyContainer : styles.listContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -186,7 +219,9 @@ export default function VideosScreen() {
         }
         ListEmptyComponent={
           <Text style={styles.emptyText}>
-            No videos yet.{'\n'}Go to Generate to create one.
+            {orientationFilter === 'all'
+              ? 'No videos yet.\nGo to Generate to create one.'
+              : `No ${orientationFilter === '9:16' ? 'portrait' : 'landscape'} videos yet.`}
           </Text>
         }
       />
@@ -198,7 +233,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BG,
-    paddingTop: 60,
+    paddingTop: 56,
   },
   center: {
     flex: 1,
@@ -206,13 +241,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heading: {
-    color: TEXT,
-    fontSize: 24,
-    fontWeight: '700',
-    paddingHorizontal: 20,
-    marginBottom: 16,
+
+  // ─── Segment toggle (orientation filter) ───
+  segmentRow: {
+    flexDirection: 'row', marginHorizontal: 20, marginTop: 16, marginBottom: 12,
+    backgroundColor: CARD, borderRadius: 10, padding: 3,
+    borderWidth: 1, borderColor: BORDER,
   },
+  segmentBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: 8,
+    alignItems: 'center',
+  },
+  segmentBtnActive: { backgroundColor: BRAND },
+  segmentText: { color: '#aaa', fontSize: 16, fontWeight: '600' },
+  segmentTextActive: { color: '#fff' },
+
+  // ─── List ───
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
@@ -228,6 +272,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+
+  // ─── Cards ───
   card: {
     backgroundColor: CARD,
     borderWidth: 1,
@@ -260,6 +306,17 @@ const styles = StyleSheet.create({
     color: MUTED,
     fontSize: 12,
     marginTop: 2,
+  },
+  orientationBadge: {
+    color: MUTED,
+    fontSize: 12,
+    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: 'hidden',
   },
   script: {
     color: MUTED,
