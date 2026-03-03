@@ -38,6 +38,9 @@ export interface ThemePalette {
   // Misc
   switchTrackOff: string;
   transparent: string;
+  headerBg: string;
+  textOnBrand: string;
+  pillBg: string;
 }
 
 export interface Theme {
@@ -54,10 +57,10 @@ export interface Theme {
       notification: string;
     };
     fonts: {
-      regular: { fontFamily: string; fontWeight: string };
-      medium: { fontFamily: string; fontWeight: string };
-      bold: { fontFamily: string; fontWeight: string };
-      heavy: { fontFamily: string; fontWeight: string };
+      regular: { fontFamily: string; fontWeight: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900' };
+      medium: { fontFamily: string; fontWeight: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900' };
+      bold: { fontFamily: string; fontWeight: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900' };
+      heavy: { fontFamily: string; fontWeight: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900' };
     };
   };
 }

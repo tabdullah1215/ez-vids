@@ -846,7 +846,7 @@ const useStyles = createThemedStyles((c) => ({
   stepTitle: {
     fontSize: 19, color: c.brand, fontWeight: '400' as const,
     textAlign: 'center' as const,
-    backgroundColor: c.textPrimary,
+    backgroundColor: c.pillBg,
     paddingHorizontal: 16,
     paddingVertical: 3,
     borderRadius: 20,
@@ -1066,12 +1066,12 @@ const useStyles = createThemedStyles((c) => ({
     backgroundColor: c.brand, borderRadius: 12,
     paddingVertical: 12, paddingHorizontal: 28,
   },
-  nextBtnText: { color: c.textPrimary, fontSize: 17, fontWeight: '600' as const },
+  nextBtnText: { color: c.textOnBrand, fontSize: 17, fontWeight: '600' as const },
   generateBtn: {
     backgroundColor: c.brand, borderRadius: 12,
     paddingVertical: 12, paddingHorizontal: 24,
   },
-  generateBtnText: { color: c.textPrimary, fontSize: 18, fontWeight: '700' as const },
+  generateBtnText: { color: c.textOnBrand, fontSize: 18, fontWeight: '700' as const },
 
   // ─── Loading / Success / Error ───
   center: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, padding: 20 },
@@ -1085,7 +1085,7 @@ const useStyles = createThemedStyles((c) => ({
     backgroundColor: c.brand, borderRadius: 14,
     paddingVertical: 14, paddingHorizontal: 36, marginTop: 24,
   },
-  primaryBtnText: { color: c.textPrimary, fontSize: 19, fontWeight: '600' as const },
+  primaryBtnText: { color: c.textOnBrand, fontSize: 19, fontWeight: '600' as const },
   secondaryBtn: {
     borderWidth: 1, borderColor: c.borderMuted, borderRadius: 10,
     paddingVertical: 12, paddingHorizontal: 28, marginTop: 20,
@@ -1107,7 +1107,7 @@ const useStyles = createThemedStyles((c) => ({
   },
   previewImage: { width: '100%' as const, aspectRatio: 1, borderRadius: 16 },
   previewCaption: {
-    color: c.textPrimary, fontSize: 18, fontWeight: '600' as const,
+    color: c.textOnBrand, fontSize: 18, fontWeight: '600' as const,
     marginTop: 16, textAlign: 'center' as const,
   },
 }));

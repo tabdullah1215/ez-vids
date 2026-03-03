@@ -42,6 +42,9 @@ export const midnightTheme: Theme = {
     // Misc
     switchTrackOff:   '#333333',
     transparent:      'transparent',
+    headerBg:         'rgba(99, 102, 241, 0.24)',
+    textOnBrand:      '#FFFFFF',
+    pillBg:           '#FFFFFF',
   },
   navigationTheme: {
     dark: true,

@@ -318,7 +318,7 @@ const useStyles = createThemedStyles((c) => ({
   },
   segmentBtnActive: { backgroundColor: c.brand },
   segmentText: { color: c.textInactive, fontSize: 16, fontWeight: '600' as const },
-  segmentTextActive: { color: c.textPrimary },
+  segmentTextActive: { color: c.textOnBrand },
 
   // ─── List ───
   listContent: {
@@ -398,7 +398,7 @@ const useStyles = createThemedStyles((c) => ({
     alignItems: 'center' as const,
   },
   openBtnText: {
-    color: c.textPrimary,
+    color: c.textOnBrand,
     fontSize: 14,
     fontWeight: '600' as const,
   },

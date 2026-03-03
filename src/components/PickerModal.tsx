@@ -368,7 +368,7 @@ const useStyles = createThemedStyles((c) => ({
     borderRadius: 16,
   },
   previewCaption: {
-    color: c.textPrimary,
+    color: c.textOnBrand,
     fontSize: 18,
     fontWeight: '600' as const,
     marginTop: 16,

@@ -24,7 +24,7 @@ function InnerLayout() {
 
 export default function RootLayout() {
   return (
-    <AppThemeProvider defaultTheme="midnight">
+    <AppThemeProvider defaultTheme="daylight">
       <InnerLayout />
     </AppThemeProvider>
   );

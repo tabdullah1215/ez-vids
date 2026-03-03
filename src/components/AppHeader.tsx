@@ -26,7 +26,7 @@ export function AppHeader({ subtitle, children }: AppHeaderProps) {
 const useStyles = createThemedStyles((c) => ({
   header: {
     alignItems: 'center' as const,
-    backgroundColor: 'rgba(99, 102, 241, 0.24)',
+    backgroundColor: c.headerBg,
     paddingTop: 4,
     paddingBottom: 8,
   },
