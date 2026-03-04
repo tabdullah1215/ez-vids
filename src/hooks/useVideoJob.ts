@@ -38,6 +38,9 @@ function getInterval(elapsedMs: number): number {
   return 60_000;
 }
 
+const MAX_POLL_DURATION_MS = 20 * 60_000; // 20 minutes
+const MAX_CONSECUTIVE_ERRORS = 5;
+
 /** Handle a poll result — returns true if terminal (stop polling) */
 function handlePollResult(
   result: { status: string; videoUrl?: string; previewUrl?: string; errorMessage?: string },
@@ -82,6 +85,7 @@ export function useVideoJob() {
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startRef = useRef(0);
+  const errCountRef = useRef(0);
 
   const cleanup = useCallback(() => {
     if (pollRef.current) clearTimeout(pollRef.current);
@@ -96,6 +100,7 @@ export function useVideoJob() {
   const startPolling = useCallback(
     (jobId: string) => {
       startRef.current = Date.now();
+      errCountRef.current = 0;
 
       setState((s) => ({
         ...s,
@@ -113,17 +118,34 @@ export function useVideoJob() {
         setState((s) => ({ ...s, elapsedSeconds: elapsed }));
       }, 1000);
 
+      const failPolling = (message: string) => {
+        cleanup();
+        setState((s) => ({ ...s, phase: 'failed', error: message }));
+      };
+
       // Recursive poll with adaptive backoff
       const schedulePoll = () => {
         const elapsedMs = Date.now() - startRef.current;
+
+        if (elapsedMs > MAX_POLL_DURATION_MS) {
+          failPolling('Video generation timed out. Check My Videos for updates.');
+          return;
+        }
+
         const interval = getInterval(elapsedMs);
 
         pollRef.current = setTimeout(async () => {
           try {
             const result = await api.getJobStatus(jobId);
+            errCountRef.current = 0; // reset on success
             if (handlePollResult(result, cleanup, setState)) return;
           } catch (err) {
-            console.warn('[useVideoJob] poll error:', err);
+            errCountRef.current++;
+            console.warn(`[useVideoJob] poll error (${errCountRef.current}/${MAX_CONSECUTIVE_ERRORS}):`, err);
+            if (errCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
+              failPolling('Lost connection to server. Check My Videos for updates.');
+              return;
+            }
           }
           schedulePoll();
         }, interval);
@@ -134,9 +156,15 @@ export function useVideoJob() {
         (async () => {
           try {
             const result = await api.getJobStatus(jobId);
+            errCountRef.current = 0;
             if (handlePollResult(result, cleanup, setState)) return;
           } catch (err) {
-            console.warn('[useVideoJob] poll error:', err);
+            errCountRef.current++;
+            console.warn(`[useVideoJob] poll error (${errCountRef.current}/${MAX_CONSECUTIVE_ERRORS}):`, err);
+            if (errCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
+              failPolling('Lost connection to server. Check My Videos for updates.');
+              return;
+            }
           }
           schedulePoll();
         })();
@@ -205,6 +233,18 @@ export function useVideoJob() {
     setState(INITIAL_STATE);
   }, [state.jobId, cleanup]);
 
+  /** Resume a preview_ready job (e.g. navigating from My Videos) */
+  const resumePreview = useCallback((jobId: string, previewUrl: string) => {
+    cleanup();
+    setState({
+      ...INITIAL_STATE,
+      phase: 'preview_ready',
+      jobId,
+      previewUrl,
+      providerStatus: 'preview_ready',
+    });
+  }, [cleanup]);
+
   /** Reset to idle */
   const reset = useCallback(() => {
     cleanup();
@@ -243,5 +283,5 @@ export function useVideoJob() {
     }, 1000);
   }, [cleanup]);
 
-  return { ...state, submit, reset, mockComplete, approve, reject };
+  return { ...state, submit, reset, mockComplete, approve, reject, resumePreview };
 }

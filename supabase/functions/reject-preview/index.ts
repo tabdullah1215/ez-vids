@@ -43,7 +43,7 @@ Deno.serve(async (req: Request) => {
 
     await db.from('video_jobs').update({
       status: 'failed',
-      error_message: 'Preview rejected by user',
+      error_message: 'Preview rejected',
       updated_at: new Date().toISOString(),
     }).eq('id', jobId);
 

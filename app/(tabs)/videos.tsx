@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { api } from '@/src/api/client';
 import { AppHeader } from '@/src/components/AppHeader';
 import { createThemedStyles, useTheme } from '@/src/theme';
@@ -17,6 +17,10 @@ import type { JobStatusAPIResponse } from '@/src/types/api';
 const ACTIVE_STATUSES = new Set(['pending', 'submitted', 'queued', 'rendering', 'created']);
 const PREVIEW_STATUSES = new Set(['preview_ready']);
 const POLL_MS = 15_000;
+
+const FRIENDLY_STATUS: Record<string, string> = {
+  preview_ready: 'Preview Ready',
+};
 
 type OrientationFilter = 'all' | '9:16' | '16:9';
 
@@ -51,11 +55,12 @@ function StatusIcon({ status }: { status: string }) {
   return <Text style={[styles.statusIcon, { color: colors.error }]}>✗</Text>;
 }
 
-function JobCard({ job, now }: { job: JobStatusAPIResponse; now: number }) {
+function JobCard({ job, now, onViewPreview }: { job: JobStatusAPIResponse; now: number; onViewPreview?: () => void }) {
   const styles = useStyles();
   const scriptPreview = job.request?.scriptText?.slice(0, 60) || '(no script)';
   const isActive = ACTIVE_STATUSES.has(job.status);
   const orientation = job.request?.aspectRatio === '16:9' ? 'Landscape' : 'Portrait';
+  const statusLabel = FRIENDLY_STATUS[job.status] ?? job.status;
 
   const referenceTime = isActive
     ? job.createdAt
@@ -66,7 +71,7 @@ function JobCard({ job, now }: { job: JobStatusAPIResponse; now: number }) {
       <View style={styles.cardHeader}>
         <StatusIcon status={job.status} />
         <View style={styles.cardMeta}>
-          <Text style={styles.statusText}>{job.status}</Text>
+          <Text style={styles.statusText}>{statusLabel}</Text>
           <Text style={styles.elapsed}>{formatElapsed(referenceTime, now)}</Text>
         </View>
         <Text style={styles.orientationBadge}>{orientation}</Text>
@@ -78,8 +83,14 @@ function JobCard({ job, now }: { job: JobStatusAPIResponse; now: number }) {
         <Text style={styles.hint}>Processing… check back shortly</Text>
       )}
 
-      {job.status === 'preview_ready' && (
-        <Text style={styles.hint}>Preview ready — approve or reject on Generate tab</Text>
+      {job.status === 'preview_ready' && onViewPreview && (
+        <TouchableOpacity
+          style={styles.previewBtn}
+          onPress={onViewPreview}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.previewBtnText}>View Preview</Text>
+        </TouchableOpacity>
       )}
 
       {job.status === 'completed' && job.videoUrl && (
@@ -102,6 +113,7 @@ function JobCard({ job, now }: { job: JobStatusAPIResponse; now: number }) {
 export default function VideosScreen() {
   const styles = useStyles();
   const { colors } = useTheme();
+  const router = useRouter();
   const [jobs, setJobs]         = useState<JobStatusAPIResponse[]>([]);
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -250,7 +262,17 @@ export default function VideosScreen() {
         data={filteredJobs}
         keyExtractor={(j) => j.jobId}
         extraData={now}
-        renderItem={({ item }) => <JobCard job={item} now={now} />}
+        renderItem={({ item }) => (
+          <JobCard
+            job={item}
+            now={now}
+            onViewPreview={
+              item.status === 'preview_ready' && item.previewUrl
+                ? () => router.navigate({ pathname: '/(tabs)', params: { resumeJobId: item.jobId, previewUrl: item.previewUrl! } })
+                : undefined
+            }
+          />
+        )}
         contentContainerStyle={filteredJobs.length === 0 ? styles.emptyContainer : styles.listContent}
         refreshControl={
           <RefreshControl
@@ -398,6 +420,19 @@ const useStyles = createThemedStyles((c) => ({
   hint: {
     color: c.brand,
     fontSize: 12,
+  },
+  previewBtn: {
+    backgroundColor: c.surfaceBrandTint,
+    borderWidth: 1,
+    borderColor: c.brand,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center' as const,
+  },
+  previewBtnText: {
+    color: c.brand,
+    fontSize: 14,
+    fontWeight: '600' as const,
   },
   openBtn: {
     backgroundColor: c.brand,

@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams } from 'expo-router';
 import { useVideoJob } from '@/src/hooks/useVideoJob';
 import { EZVIDS_DEFAULTS } from '@/src/config/defaults';
 import { api } from '@/src/api/client';
@@ -61,6 +62,7 @@ export default function GenerateScreen() {
   // --- Wizard step ---
   const [step, setStep] = useState(0);
   const directionRef = useRef<'forward' | 'back'>('forward');
+  const isPreviewFlowRef = useRef(false);
 
   // --- Form state ---
   const [scriptText, setScriptText] = useState('');
@@ -108,6 +110,18 @@ export default function GenerateScreen() {
   const [previewItem, setPreviewItem] = useState<PickerItem | null>(null);
 
   const job = useVideoJob();
+
+  // ─── Resume preview from My Videos navigation ─────────────
+  const { resumeJobId, previewUrl: resumePreviewUrl } = useLocalSearchParams<{ resumeJobId?: string; previewUrl?: string }>();
+  const resumedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (resumeJobId && resumePreviewUrl && resumedRef.current !== resumeJobId) {
+      resumedRef.current = resumeJobId;
+      isPreviewFlowRef.current = true;
+      job.resumePreview(resumeJobId, resumePreviewUrl);
+    }
+  }, [resumeJobId, resumePreviewUrl]);
 
   // ─── Data fetching ────────────────────────────────────────
   const fetchAvatars = useCallback(async () => {
@@ -313,6 +327,7 @@ export default function GenerateScreen() {
       flashStyleTiles();
       return;
     }
+    isPreviewFlowRef.current = false;
     if (testMode) {
       job.mockComplete(TEST_VIDEO_URL);
       return;
@@ -333,6 +348,7 @@ export default function GenerateScreen() {
       flashStyleTiles();
       return;
     }
+    isPreviewFlowRef.current = true;
     if (testMode) {
       job.mockComplete(TEST_VIDEO_URL);
       return;
@@ -814,6 +830,7 @@ export default function GenerateScreen() {
           <Text style={s.statusTitle}>
             {job.phase === 'submitting' ? 'Submitting...'
               : job.phase === 'approving' ? 'Starting render...'
+              : isPreviewFlowRef.current ? 'Creating preview...'
               : 'Creating your video...'}
           </Text>
           {job.providerStatus && (
@@ -846,7 +863,7 @@ export default function GenerateScreen() {
             />
           </View>
           <View style={s.previewActions}>
-            <TouchableOpacity style={s.rejectBtn} onPress={job.reject} activeOpacity={0.8}>
+            <TouchableOpacity style={s.rejectBtn} onPress={() => { job.reject(); setStep(0); }} activeOpacity={0.8}>
               <Text style={s.rejectBtnText}>Reject</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.approveBtn} onPress={job.approve} activeOpacity={0.8}>
