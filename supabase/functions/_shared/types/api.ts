@@ -11,6 +11,7 @@ export interface GenerateVideoAPIRequest {
   productName?: string;
   aspectRatio?: '9:16' | '1:1' | '16:9';
   captionsEnabled?: boolean;
+  jobMode?: 'preview' | 'render';
 }
 
 /** POST /functions/v1/generate-video — server returns this */
@@ -30,6 +31,8 @@ export interface JobStatusAPIResponse {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  previewUrl?: string;
+  jobMode?: 'preview' | 'render';
 }
 
 /** GET /functions/v1/list-avatars — server returns this */

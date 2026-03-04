@@ -48,7 +48,8 @@ Deno.serve(async (req: Request) => {
       visualStyle: body.visualStyle,
     };
 
-    const job = await service.createJob(userId, request);
+    const jobMode = body.jobMode || 'render';
+    const job = await service.createJob(userId, request, jobMode);
 
     return new Response(
       JSON.stringify({ jobId: job.id, status: job.status }),

@@ -15,6 +15,7 @@ import { createThemedStyles, useTheme } from '@/src/theme';
 import type { JobStatusAPIResponse } from '@/src/types/api';
 
 const ACTIVE_STATUSES = new Set(['pending', 'submitted', 'queued', 'rendering', 'created']);
+const PREVIEW_STATUSES = new Set(['preview_ready']);
 const POLL_MS = 15_000;
 
 type OrientationFilter = 'all' | '9:16' | '16:9';
@@ -44,6 +45,9 @@ function StatusIcon({ status }: { status: string }) {
   if (status === 'completed') {
     return <Text style={[styles.statusIcon, { color: colors.success }]}>✓</Text>;
   }
+  if (PREVIEW_STATUSES.has(status)) {
+    return <Text style={[styles.statusIcon, { color: colors.brandLight }]}>⏸</Text>;
+  }
   return <Text style={[styles.statusIcon, { color: colors.error }]}>✗</Text>;
 }
 
@@ -72,6 +76,10 @@ function JobCard({ job, now }: { job: JobStatusAPIResponse; now: number }) {
 
       {isActive && (
         <Text style={styles.hint}>Processing… check back shortly</Text>
+      )}
+
+      {job.status === 'preview_ready' && (
+        <Text style={styles.hint}>Preview ready — approve or reject on Generate tab</Text>
       )}
 
       {job.status === 'completed' && job.videoUrl && (

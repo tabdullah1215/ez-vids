@@ -12,6 +12,7 @@ export interface GenerateVideoAPIRequest {
   aspectRatio?: '9:16' | '1:1' | '16:9';
   captionsEnabled?: boolean;
   visualStyle?: string;
+  jobMode?: 'preview' | 'render';
 }
 
 /** POST /api/videos/generate — server returns this */
@@ -32,6 +33,8 @@ export interface JobStatusAPIResponse {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  previewUrl?: string;
+  jobMode?: 'preview' | 'render';
 }
 
 /** GET /api/credit-balance — server returns this */

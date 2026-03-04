@@ -38,6 +38,8 @@ Deno.serve(async (req: Request) => {
         createdAt: job.createdAt,
         updatedAt: job.updatedAt,
         completedAt: job.completedAt,
+        previewUrl: job.previewUrl,
+        jobMode: job.jobMode,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

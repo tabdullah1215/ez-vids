@@ -17,6 +17,9 @@ CREATE TABLE api_rate_limits (
   PRIMARY KEY (api, caller)
 );
 
+-- Lock down: only service_role (backend) should access this table
+ALTER TABLE api_rate_limits ENABLE ROW LEVEL SECURITY;
+
 -- Seed: separate budgets per worker
 INSERT INTO api_rate_limits (api, caller, window_start, calls_made, max_calls, window_secs)
 VALUES

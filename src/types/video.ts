@@ -8,6 +8,7 @@ export type JobStatus =
   | 'submitted'
   | 'queued'
   | 'rendering'
+  | 'preview_ready'
   | 'completed'
   | 'failed';
 
@@ -41,4 +42,6 @@ export interface VideoJob {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  previewUrl?: string;
+  jobMode?: 'preview' | 'render';
 }

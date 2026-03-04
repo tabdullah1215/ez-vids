@@ -52,42 +52,44 @@ function fmtRatio(r: string): string {
   return r.replace(':', 'x');
 }
 
+/** Build the lipsyncs_v2 payload from a VideoRequest */
+function buildPayload(req: VideoRequest) {
+  const segment: Record<string, unknown> = {
+    character: {
+      type: 'avatar',
+      avatar_id: req.avatarId,
+      avatar_style: 'normal',
+      offset: { x: 0, y: 0 },
+    },
+    voice: req.voiceMode === 'user_audio' && req.audioUrl
+      ? { type: 'audio', input_audio: req.audioUrl }
+      : { type: 'text', input_text: req.scriptText, voice_id: req.voiceId },
+    background: {
+      type: 'image',
+      url: req.productImageUrl || 'https://placehold.co/600x600/111111/111111',
+      fit: 'crop',
+    },
+  };
+
+  if (req.visualStyle) {
+    segment.visual_style = req.visualStyle;
+  }
+
+  if (req.captions.enabled && req.captions.style) {
+    segment.caption_setting = { style: req.captions.style };
+  }
+
+  return {
+    video_inputs: [segment],
+    aspect_ratio: fmtRatio(req.aspectRatio),
+  };
+}
+
 export const creatifyProvider: VideoProvider = {
   name: 'creatify',
 
   async createJob(req: VideoRequest) {
-    // Build the v2 segment
-    const segment: Record<string, unknown> = {
-      character: {
-        type: 'avatar',
-        avatar_id: req.avatarId,
-        avatar_style: 'normal',
-        offset: { x: 0, y: 0 },
-      },
-      voice: req.voiceMode === 'user_audio' && req.audioUrl
-        ? { type: 'audio', input_audio: req.audioUrl }
-        : { type: 'text', input_text: req.scriptText, voice_id: req.voiceId },
-      background: {
-        type: 'image',
-        url: req.productImageUrl || 'https://placehold.co/600x600/111111/111111',
-        fit: 'crop',
-      },
-    };
-
-    // Visual style (overrides character/background positioning when set)
-    if (req.visualStyle) {
-      segment.visual_style = req.visualStyle;
-    }
-
-    // Captions
-    if (req.captions.enabled && req.captions.style) {
-      segment.caption_setting = { style: req.captions.style };
-    }
-
-    const payload = {
-      video_inputs: [segment],
-      aspect_ratio: fmtRatio(req.aspectRatio),
-    };
+    const payload = buildPayload(req);
 
     console.log('[creatify] POST /api/lipsyncs_v2/', JSON.stringify(payload));
 
@@ -110,6 +112,51 @@ export const creatifyProvider: VideoProvider = {
     };
   },
 
+  async createPreviewJob(req: VideoRequest) {
+    const payload = buildPayload(req);
+
+    console.log('[creatify] POST /api/lipsyncs_v2/preview/', JSON.stringify(payload));
+
+    const res = await fetch(`${CREATIFY_BASE}/api/lipsyncs_v2/preview/`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(payload),
+    });
+
+    if (res.status === 429) throw new RateLimitedError('createPreviewJob');
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Creatify createPreviewJob ${res.status}: ${err}`);
+    }
+
+    const data = await res.json();
+    return {
+      providerJobId: data.id,
+      status: mapStatus(data.status || 'pending'),
+    };
+  },
+
+  async renderFromPreview(providerJobId: string) {
+    console.log(`[creatify] POST /api/lipsyncs_v2/${providerJobId}/render/`);
+
+    const res = await fetch(
+      `${CREATIFY_BASE}/api/lipsyncs_v2/${providerJobId}/render/`,
+      { method: 'POST', headers: headers() }
+    );
+
+    if (res.status === 429) throw new RateLimitedError('renderFromPreview');
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Creatify renderFromPreview ${res.status}: ${err}`);
+    }
+
+    const data = await res.json();
+    return {
+      providerJobId: data.id,
+      status: mapStatus(data.status || 'pending'),
+    };
+  },
+
   async checkJobStatus(providerJobId: string) {
     const res = await fetch(
       `${CREATIFY_BASE}/api/lipsyncs_v2/${providerJobId}/`,
@@ -123,6 +170,7 @@ export const creatifyProvider: VideoProvider = {
     }
 
     const d = await res.json();
+    console.log(`[creatify] checkJobStatus raw response for ${providerJobId}:`, JSON.stringify({ status: d.status, preview: d.preview, output: d.output, failed_reason: d.failed_reason }));
     return {
       status: mapStatus(d.status),
       videoUrl: d.output || undefined,
@@ -130,6 +178,7 @@ export const creatifyProvider: VideoProvider = {
       creditsUsed: d.credits_used || undefined,
       progress: d.progress || undefined,
       errorMessage: d.failed_reason || undefined,
+      previewUrl: d.preview || undefined,
     };
   },
 

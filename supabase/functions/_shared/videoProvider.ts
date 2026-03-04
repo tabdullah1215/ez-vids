@@ -12,6 +12,16 @@ export interface VideoProvider {
     status: JobStatus;
   }>;
 
+  createPreviewJob(request: VideoRequest): Promise<{
+    providerJobId: string;
+    status: JobStatus;
+  }>;
+
+  renderFromPreview(providerJobId: string): Promise<{
+    providerJobId: string;
+    status: JobStatus;
+  }>;
+
   checkJobStatus(providerJobId: string): Promise<{
     status: JobStatus;
     videoUrl?: string;
@@ -19,6 +29,7 @@ export interface VideoProvider {
     creditsUsed?: number;
     progress?: string;
     errorMessage?: string;
+    previewUrl?: string;
   }>;
 
   listAvatars(): Promise<Array<{

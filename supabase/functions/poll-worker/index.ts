@@ -59,19 +59,34 @@ Deno.serve(async (req: Request) => {
       try {
         const result = await creatifyProvider.checkJobStatus(job.provider_job_id);
 
+        const isPreviewJob = job.job_mode === 'preview';
+        console.log(`[poll-worker] Job ${job.id}: job_mode=${job.job_mode}, creatify_status=${result.status}, previewUrl=${result.previewUrl || 'none'}, videoUrl=${result.videoUrl || 'none'}`);
+
         const updates: Record<string, unknown> = {
-          status: result.status,
           updated_at: new Date().toISOString(),
         };
-        if (result.videoUrl)     updates.video_url     = result.videoUrl;
-        if (result.thumbnailUrl) updates.thumbnail_url = result.thumbnailUrl;
-        if (result.creditsUsed)  updates.credits_used  = result.creditsUsed;
-        if (result.errorMessage) updates.error_message = result.errorMessage;
-        if (result.status === 'completed') {
+
+        if (isPreviewJob && result.previewUrl) {
+          // Preview URL is available — park as preview_ready
+          updates.status = 'preview_ready';
+          updates.preview_url = result.previewUrl;
+          if (result.creditsUsed) updates.credits_used = result.creditsUsed;
+          completed++;
+        } else if (result.status === 'completed') {
+          // Full render completed
+          updates.status = 'completed';
+          if (result.videoUrl) updates.video_url = result.videoUrl;
+          if (result.thumbnailUrl) updates.thumbnail_url = result.thumbnailUrl;
+          if (result.creditsUsed) updates.credits_used = result.creditsUsed;
           updates.completed_at = new Date().toISOString();
           completed++;
+        } else if (result.status === 'failed') {
+          updates.status = 'failed';
+          if (result.errorMessage) updates.error_message = result.errorMessage;
+          failed++;
+        } else {
+          updates.status = result.status;
         }
-        if (result.status === 'failed') failed++;
 
         await db.from('video_jobs').update(updates).eq('id', job.id);
         polled++;

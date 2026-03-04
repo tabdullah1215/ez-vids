@@ -53,6 +53,16 @@ class EZVidsApiClient {
     return this.invoke<GenerateVideoAPIResponse>('generate-video', input);
   }
 
+  /** Approve a preview and trigger full render */
+  renderVideo(jobId: string) {
+    return this.invoke<GenerateVideoAPIResponse>('render-video', { jobId });
+  }
+
+  /** Reject a preview — marks the job as failed */
+  rejectPreview(jobId: string) {
+    return this.invoke<{ jobId: string; status: string }>('reject-preview', { jobId });
+  }
+
   /** Poll job status */
   getJobStatus(jobId: string) {
     return this.invoke<JobStatusAPIResponse>('job-status', { jobId });

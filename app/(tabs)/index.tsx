@@ -23,6 +23,7 @@ import Animated, {
   SlideInRight, SlideInLeft, SlideOutLeft, SlideOutRight,
   useSharedValue, useAnimatedStyle, withSequence, withTiming,
 } from 'react-native-reanimated';
+import { WebView } from 'react-native-webview';
 import { AppHeader } from '@/src/components/AppHeader';
 import { createThemedStyles, useTheme } from '@/src/theme';
 import type { PickerItem } from '@/src/components/PickerModal';
@@ -327,6 +328,27 @@ export default function GenerateScreen() {
     });
   };
 
+  const handlePreview = () => {
+    if (!visualStyle) {
+      flashStyleTiles();
+      return;
+    }
+    if (testMode) {
+      job.mockComplete(TEST_VIDEO_URL);
+      return;
+    }
+    job.submit({
+      voiceMode: 'tts',
+      scriptText:      scriptText.trim()      || undefined,
+      avatarId:        avatarId.trim()         || undefined,
+      voiceId:         voiceId.trim()          || undefined,
+      productImageUrl: productImageUrl.trim()  || undefined,
+      visualStyle:     visualStyle.trim()      || undefined,
+      aspectRatio,
+      jobMode: 'preview',
+    });
+  };
+
   const handleOpenVideo = () => {
     if (job.videoUrl) {
       Linking.openURL(job.videoUrl).catch(() =>
@@ -353,7 +375,8 @@ export default function GenerateScreen() {
 
   // ─── Derived state ────────────────────────────────────────
   const showWizard = job.phase === 'idle';
-  const showLoading = job.phase === 'submitting' || job.phase === 'polling';
+  const showLoading = job.phase === 'submitting' || job.phase === 'polling' || job.phase === 'approving';
+  const showPreview = job.phase === 'preview_ready' && !!job.previewUrl;
   const showSuccess = job.phase === 'completed' && !!job.videoUrl;
   const showError = job.phase === 'failed';
 
@@ -769,9 +792,16 @@ export default function GenerateScreen() {
                 <Text style={s.nextBtnText}>{'Next  ›'}</Text>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity style={s.generateBtn} onPress={handleGenerate} activeOpacity={0.8}>
-                <Text style={s.generateBtnText}>Generate Video</Text>
-              </TouchableOpacity>
+              <View style={s.generateRow}>
+                <TouchableOpacity style={s.previewBtn} onPress={handlePreview} activeOpacity={0.8}>
+                  <Text style={s.previewBtnText}>Preview</Text>
+                  <Text style={s.creditHint}>1 credit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.generateBtn} onPress={handleGenerate} activeOpacity={0.8}>
+                  <Text style={s.generateBtnText}>Generate</Text>
+                  <Text style={s.creditHint}>5 credits</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </>
@@ -782,7 +812,9 @@ export default function GenerateScreen() {
         <View style={s.center}>
           <ActivityIndicator size="large" color={colors.brand} />
           <Text style={s.statusTitle}>
-            {job.phase === 'submitting' ? 'Submitting...' : 'Creating your video...'}
+            {job.phase === 'submitting' ? 'Submitting...'
+              : job.phase === 'approving' ? 'Starting render...'
+              : 'Creating your video...'}
           </Text>
           {job.providerStatus && (
             <Text style={s.statusLabel}>Status: {job.providerStatus}</Text>
@@ -792,6 +824,36 @@ export default function GenerateScreen() {
           {job.jobId && (
             <Text style={s.mono}>Job: {job.jobId.slice(0, 8)}...</Text>
           )}
+        </View>
+      )}
+
+      {/* ═══ PREVIEW READY ═══ */}
+      {showPreview && (
+        <View style={s.previewScreen}>
+          <Text style={s.previewTitle}>Preview Ready</Text>
+          <View style={s.webviewContainer}>
+            <WebView
+              source={{ uri: job.previewUrl! }}
+              style={s.webview}
+              javaScriptEnabled
+              domStorageEnabled
+              startInLoadingState
+              renderLoading={() => (
+                <View style={s.webviewLoader}>
+                  <ActivityIndicator size="large" color={colors.brand} />
+                </View>
+              )}
+            />
+          </View>
+          <View style={s.previewActions}>
+            <TouchableOpacity style={s.rejectBtn} onPress={job.reject} activeOpacity={0.8}>
+              <Text style={s.rejectBtnText}>Reject</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.approveBtn} onPress={job.approve} activeOpacity={0.8}>
+              <Text style={s.approveBtnText}>Approve & Render</Text>
+              <Text style={s.creditHint}>+4 credits</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -1067,11 +1129,53 @@ const useStyles = createThemedStyles((c) => ({
     paddingVertical: 12, paddingHorizontal: 28,
   },
   nextBtnText: { color: c.textOnBrand, fontSize: 17, fontWeight: '600' as const },
+  generateRow: {
+    flexDirection: 'row' as const, gap: 12, flex: 1, justifyContent: 'flex-end' as const,
+  },
+  previewBtn: {
+    borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20,
+    borderWidth: 1, borderColor: c.brand, alignItems: 'center' as const,
+  },
+  previewBtnText: { color: c.brand, fontSize: 17, fontWeight: '600' as const },
+  creditHint: { color: c.textMuted, fontSize: 12, marginTop: 2 },
   generateBtn: {
     backgroundColor: c.brand, borderRadius: 12,
-    paddingVertical: 12, paddingHorizontal: 24,
+    paddingVertical: 12, paddingHorizontal: 24, alignItems: 'center' as const,
   },
   generateBtnText: { color: c.textOnBrand, fontSize: 18, fontWeight: '700' as const },
+
+  // ─── Preview screen ───
+  previewScreen: {
+    flex: 1, padding: 16, paddingTop: 12,
+  },
+  previewTitle: {
+    fontSize: 22, fontWeight: '700' as const, color: c.textPrimary,
+    textAlign: 'center' as const, marginBottom: 12,
+  },
+  webviewContainer: {
+    flex: 1, borderRadius: 12, overflow: 'hidden' as const,
+    borderWidth: 1, borderColor: c.border,
+  },
+  webview: { flex: 1 },
+  webviewLoader: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center' as const, justifyContent: 'center' as const,
+    backgroundColor: c.bg,
+  },
+  previewActions: {
+    flexDirection: 'row' as const, gap: 12,
+    justifyContent: 'center' as const, paddingTop: 16, paddingBottom: 8,
+  },
+  rejectBtn: {
+    borderRadius: 12, paddingVertical: 14, paddingHorizontal: 28,
+    borderWidth: 1, borderColor: c.borderMuted,
+  },
+  rejectBtnText: { color: c.textTertiary, fontSize: 17, fontWeight: '600' as const },
+  approveBtn: {
+    backgroundColor: c.brand, borderRadius: 12,
+    paddingVertical: 14, paddingHorizontal: 28, alignItems: 'center' as const,
+  },
+  approveBtnText: { color: c.textOnBrand, fontSize: 17, fontWeight: '700' as const },
 
   // ─── Loading / Success / Error ───
   center: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, padding: 20 },

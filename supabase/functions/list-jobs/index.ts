@@ -42,6 +42,8 @@ Deno.serve(async (req: Request) => {
       createdAt:     r.created_at,
       updatedAt:     r.updated_at,
       completedAt:   r.completed_at   ?? undefined,
+      previewUrl:    r.preview_url    ?? undefined,
+      jobMode:       r.job_mode       ?? 'render',
     }));
 
     return new Response(

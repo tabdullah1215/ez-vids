@@ -53,7 +53,12 @@ Deno.serve(async (req: Request) => {
 
     for (const job of jobs) {
       try {
-        const result = await creatifyProvider.createJob(job.request);
+        const isPreview = job.job_mode === 'preview';
+        console.log(`[submit-worker] Submitting job ${job.id}, job_mode=${job.job_mode}, isPreview=${isPreview}`);
+        const result = isPreview
+          ? await creatifyProvider.createPreviewJob(job.request)
+          : await creatifyProvider.createJob(job.request);
+        console.log(`[submit-worker] Job ${job.id} submitted, providerJobId=${result.providerJobId}, status=${result.status}`);
 
         await db.from('video_jobs').update({
           provider_job_id: result.providerJobId,

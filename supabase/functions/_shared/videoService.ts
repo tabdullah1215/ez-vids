@@ -15,13 +15,13 @@ export class VideoService {
    * Insert a new job as 'pending' — no Creatify call.
    * The submit-worker cron picks it up and submits to Creatify.
    */
-  async createJob(userId: string, request: VideoRequest): Promise<VideoJob> {
+  async createJob(userId: string, request: VideoRequest, jobMode: 'preview' | 'render' = 'render'): Promise<VideoJob> {
     const db = getSupabase();
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
     const job: VideoJob = {
-      id, userId, status: 'pending', request,
+      id, userId, status: 'pending', request, jobMode,
       createdAt: now, updatedAt: now,
     };
 
@@ -30,6 +30,7 @@ export class VideoService {
       user_id: job.userId,
       status: job.status,
       request: job.request,
+      job_mode: jobMode,
       created_at: job.createdAt,
       updated_at: job.updatedAt,
     });
@@ -68,6 +69,8 @@ export class VideoService {
       createdAt: r.created_at as string,
       updatedAt: r.updated_at as string,
       completedAt: r.completed_at as string | undefined,
+      previewUrl: r.preview_url as string | undefined,
+      jobMode: (r.job_mode as 'preview' | 'render') || 'render',
     };
   }
 }
