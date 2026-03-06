@@ -17,6 +17,7 @@ const MAPPING = {
   'bolt.fill': 'bolt',
   'film.fill': 'videocam',
   'chevron.right': 'chevron-right',
+  'gearshape.fill': 'settings',
 } as IconMapping;
 
 /**

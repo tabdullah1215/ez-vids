@@ -525,7 +525,7 @@ export default function GenerateScreen() {
                   <React.Fragment key={i}>
                     {i > 0 && <View style={[s.stepLine, (done || active) && s.stepLineDone]} />}
                     <View style={[s.stepCircle, active && s.stepCircleActive, done && s.stepCircleDone]}>
-                      <Text style={[s.stepNum, (active || done) && s.stepNumActive]}>
+                      <Text style={[s.stepNum, active && s.stepNumActive, done && s.stepNumDone]}>
                         {i + 1}
                       </Text>
                     </View>
@@ -771,13 +771,13 @@ export default function GenerateScreen() {
 
           {/* ─── Footer Nav ─── */}
           <View style={s.footer}>
-            {step > 0 ? (
+            {step > 0 && step < STEP_COUNT - 1 && (
               <TouchableOpacity style={s.backBtn} onPress={() => { directionRef.current = 'back'; setStep(step - 1); }}>
                 <Text style={s.backBtnText}>{'‹  Back'}</Text>
               </TouchableOpacity>
-            ) : (
-              <View />
             )}
+
+            {step === 0 && <View />}
 
             {step < STEP_COUNT - 1 ? (
               <TouchableOpacity style={s.nextBtn} onPress={() => {
@@ -809,13 +809,14 @@ export default function GenerateScreen() {
               </TouchableOpacity>
             ) : (
               <View style={s.generateRow}>
+                <TouchableOpacity style={s.generateRowBack} onPress={() => { directionRef.current = 'back'; setStep(step - 1); }}>
+                  <Text style={s.backBtnText}>{'‹  Back'}</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={s.previewBtn} onPress={handlePreview} activeOpacity={0.8}>
                   <Text style={s.previewBtnText}>Preview</Text>
-                  <Text style={s.creditHint}>1 credit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.generateBtn} onPress={handleGenerate} activeOpacity={0.8}>
                   <Text style={s.generateBtnText}>Generate</Text>
-                  <Text style={s.creditHint}>5 credits</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -950,10 +951,10 @@ const useStyles = createThemedStyles((c) => ({
     fontSize: 14, fontWeight: '700' as const, color: c.textMuted,
   },
   stepNumActive: {
-    color: c.textPrimary,
-    textShadowColor: c.brand,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
+    color: c.textOnBrand,
+  },
+  stepNumDone: {
+    color: c.brand,
   },
   stepLine: {
     width: 24, height: 2, backgroundColor: c.textMuted,
@@ -990,7 +991,7 @@ const useStyles = createThemedStyles((c) => ({
     borderRadius: 8,
   },
   segmentText: { color: c.textInactive, fontSize: 16, fontWeight: '600' as const },
-  segmentTextActive: { color: c.textPrimary },
+  segmentTextActive: { color: c.textOnBrand },
 
   // ─── Selection summary ───
   selectionSummary: {
@@ -1137,29 +1138,38 @@ const useStyles = createThemedStyles((c) => ({
     paddingVertical: 16, borderTopWidth: 1, borderColor: c.border,
   },
   backBtn: {
-    paddingVertical: 12, paddingHorizontal: 28,
+    paddingVertical: 12, paddingHorizontal: 24,
     borderWidth: 1, borderColor: c.borderMuted, borderRadius: 12,
+    alignItems: 'center' as const,
   },
-  backBtnText: { color: c.textTertiary, fontSize: 17, fontWeight: '600' as const },
+  backBtnText: { color: c.textTertiary, fontSize: 16, fontWeight: '600' as const },
   nextBtn: {
     backgroundColor: c.brand, borderRadius: 12,
-    paddingVertical: 12, paddingHorizontal: 28,
+    paddingVertical: 12, paddingHorizontal: 24,
+    alignItems: 'center' as const,
   },
-  nextBtnText: { color: c.textOnBrand, fontSize: 17, fontWeight: '600' as const },
+  nextBtnText: { color: c.textOnBrand, fontSize: 16, fontWeight: '600' as const },
   generateRow: {
-    flexDirection: 'row' as const, gap: 12, flex: 1, justifyContent: 'flex-end' as const,
+    flex: 1, flexDirection: 'row' as const, gap: 10,
+  },
+  generateRowBack: {
+    paddingVertical: 12, paddingHorizontal: 24,
+    borderWidth: 1, borderColor: c.borderMuted, borderRadius: 12,
+    alignItems: 'center' as const,
   },
   previewBtn: {
-    borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20,
+    flex: 1, borderRadius: 12, paddingVertical: 12,
     borderWidth: 1, borderColor: c.brand, alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
-  previewBtnText: { color: c.brand, fontSize: 17, fontWeight: '600' as const },
-  creditHint: { color: c.textMuted, fontSize: 12, marginTop: 2 },
+  previewBtnText: { color: c.brand, fontSize: 16, fontWeight: '600' as const },
+  creditHint: { color: c.textMuted, fontSize: 11, marginTop: 0 },
   generateBtn: {
-    backgroundColor: c.brand, borderRadius: 12,
-    paddingVertical: 12, paddingHorizontal: 24, alignItems: 'center' as const,
+    flex: 1, backgroundColor: c.brand, borderRadius: 12,
+    paddingVertical: 12, alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
-  generateBtnText: { color: c.textOnBrand, fontSize: 18, fontWeight: '700' as const },
+  generateBtnText: { color: c.textOnBrand, fontSize: 16, fontWeight: '600' as const },
 
   // ─── Preview screen ───
   previewScreen: {

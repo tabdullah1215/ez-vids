@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
+import { getAuthenticatedUser } from '../_shared/auth.ts';
 
 const MAX_BASE64_BYTES = 5 * 1024 * 1024; // 5 MB
 
@@ -15,7 +16,7 @@ Deno.serve(async (req: Request) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const userId = req.headers.get('x-user-id') || 'anonymous';
+    const userId = await getAuthenticatedUser(req);
     const { base64, mimeType } = (await req.json()) as {
       base64: string;
       mimeType?: string;
@@ -66,6 +67,7 @@ Deno.serve(async (req: Request) => {
       { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (err) {
+    if (err instanceof Response) return err;
     console.error('[upload-product-image]', err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : 'Internal server error' }),

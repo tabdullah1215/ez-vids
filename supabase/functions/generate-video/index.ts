@@ -1,4 +1,5 @@
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
+import { getAuthenticatedUser } from '../_shared/auth.ts';
 import { creatifyProvider } from '../_shared/creatifyProvider.ts';
 import { VideoService } from '../_shared/videoService.ts';
 import { EZVIDS_DEFAULTS } from '../_shared/defaults.ts';
@@ -12,7 +13,7 @@ Deno.serve(async (req: Request) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const userId = req.headers.get('x-user-id') || 'anonymous';
+    const userId = await getAuthenticatedUser(req);
     const body: GenerateVideoAPIRequest = await req.json();
 
     // Validate: TTS requires scriptText, user_audio requires audioUrl
@@ -56,6 +57,7 @@ Deno.serve(async (req: Request) => {
       { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
+    if (err instanceof Response) return err;
     console.error('[generate-video]', err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : 'Internal server error' }),

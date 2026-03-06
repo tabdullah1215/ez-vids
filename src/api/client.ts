@@ -6,25 +6,21 @@ import type {
   VoiceListResponse,
   CreditBalanceResponse,
 } from '../types/api';
+import { supabase } from '../lib/supabase';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 const FUNCTIONS_BASE = `${SUPABASE_URL}/functions/v1`;
 
 class EZVidsApiClient {
-  private userId: string;
-
-  constructor() {
-    // MVP: hardcoded user. Replace with Supabase Auth session token.
-    this.userId = 'mvp-test-user';
-  }
-
-  /** Update user ID after auth is implemented */
-  setUserId(id: string) {
-    this.userId = id;
+  private async getAccessToken(): Promise<string> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+    return session.access_token;
   }
 
   private async invoke<T>(functionName: string, body?: unknown): Promise<T> {
+    const token = await this.getAccessToken();
     const url = `${FUNCTIONS_BASE}/${functionName}`;
 
     console.log(`[EZVids API] POST ${url}`);
@@ -35,7 +31,7 @@ class EZVidsApiClient {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         'apikey': SUPABASE_ANON_KEY,
-        'x-user-id': this.userId,
+        'x-user-token': token,
       },
       body: JSON.stringify(body ?? {}),
     });

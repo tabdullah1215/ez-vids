@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
+import { getAuthenticatedUser } from '../_shared/auth.ts';
 
 function getSupabase() {
   return createClient(
@@ -13,13 +14,7 @@ Deno.serve(async (req: Request) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const userId = req.headers.get('x-user-id');
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing x-user-id header' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
+    const userId = await getAuthenticatedUser(req);
 
     const db = getSupabase();
 
@@ -51,6 +46,7 @@ Deno.serve(async (req: Request) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (err) {
+    if (err instanceof Response) return err;
     console.error('[list-jobs]', err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : 'Internal error' }),

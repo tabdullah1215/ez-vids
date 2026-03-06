@@ -1,4 +1,5 @@
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
+import { getAuthenticatedUser } from '../_shared/auth.ts';
 import { creatifyProvider } from '../_shared/creatifyProvider.ts';
 import { VideoService } from '../_shared/videoService.ts';
 
@@ -9,6 +10,7 @@ Deno.serve(async (req: Request) => {
   if (corsResponse) return corsResponse;
 
   try {
+    const userId = await getAuthenticatedUser(req);
     const { jobId } = await req.json();
 
     if (!jobId) {
@@ -24,6 +26,13 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: 'Job not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (job.userId !== userId) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -44,6 +53,7 @@ Deno.serve(async (req: Request) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
+    if (err instanceof Response) return err;
     console.error('[job-status]', err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : 'Internal server error' }),

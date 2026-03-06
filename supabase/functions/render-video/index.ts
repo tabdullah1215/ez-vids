@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
+import { getAuthenticatedUser } from '../_shared/auth.ts';
 import { creatifyProvider, RateLimitedError } from '../_shared/creatifyProvider.ts';
 
 function getSupabase() {
@@ -14,6 +15,7 @@ Deno.serve(async (req: Request) => {
   if (corsResponse) return corsResponse;
 
   try {
+    const userId = await getAuthenticatedUser(req);
     const { jobId } = await req.json();
 
     if (!jobId) {
@@ -32,6 +34,13 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: 'Job not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    if (row.user_id !== userId) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -66,6 +75,7 @@ Deno.serve(async (req: Request) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (err) {
+    if (err instanceof Response) return err;
     if (err instanceof RateLimitedError) {
       return new Response(
         JSON.stringify({ error: 'Rate limited — try again shortly' }),
