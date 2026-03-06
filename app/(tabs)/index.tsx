@@ -133,7 +133,7 @@ export default function GenerateScreen() {
       setAvatars(res.avatars.map((a) => ({
         id: a.id,
         label: a.name,
-        sublabel: a.gender ?? '',
+        sublabel: [a.gender, a.style].filter(Boolean).join(' · '),
         imageUrl: a.previewUrl,
       })));
     } catch (err) {

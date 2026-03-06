@@ -48,6 +48,7 @@ export interface AvatarListResponse {
     id: string;
     name: string;
     gender?: string;
+    style?: string;
     previewUrl?: string;
   }>;
 }

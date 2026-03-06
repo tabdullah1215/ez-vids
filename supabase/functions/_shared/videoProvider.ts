@@ -36,6 +36,7 @@ export interface VideoProvider {
     id: string;
     name: string;
     gender?: string;
+    style?: string;
     previewUrl?: string;
   }>>;
 

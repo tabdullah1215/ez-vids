@@ -196,6 +196,7 @@ export const creatifyProvider: VideoProvider = {
       id: p.id as string,
       name: (p.creator_name as string) || (p.name as string) || 'Unnamed',
       gender: p.gender as string | undefined,
+      style: p.style as string | undefined,
       previewUrl: (p.preview_image_1_1 || p.preview_image_9_16 || p.preview_image_16_9) as string | undefined,
     }));
   },
