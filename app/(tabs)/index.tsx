@@ -54,6 +54,39 @@ const VISUAL_STYLES = [
 const STEPS = ['voice over', 'avatar', 'product', 'style'] as const;
 const STEP_COUNT = STEPS.length;
 
+// ─── Button with spinner feedback on press ──────────────────
+function SpinButton({ style, onPress, activeOpacity, spinnerColor, children }: {
+  style: any;
+  onPress: () => void;
+  activeOpacity?: number;
+  spinnerColor?: string;
+  children: React.ReactNode;
+}) {
+  const [spinning, setSpinning] = React.useState(false);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  return (
+    <TouchableOpacity
+      style={style}
+      disabled={spinning}
+      onPress={() => {
+        setSpinning(true);
+        timerRef.current = setTimeout(() => {
+          setSpinning(false);
+          onPress();
+        }, 500);
+      }}
+      activeOpacity={activeOpacity ?? 0.2}
+    >
+      {spinning
+        ? <ActivityIndicator size="small" color={spinnerColor ?? '#fff'} />
+        : children}
+    </TouchableOpacity>
+  );
+}
+
 // ─── Main Component ─────────────────────────────────────────
 export default function GenerateScreen() {
   const s = useStyles();
@@ -772,15 +805,15 @@ export default function GenerateScreen() {
           {/* ─── Footer Nav ─── */}
           <View style={s.footer}>
             {step > 0 && step < STEP_COUNT - 1 && (
-              <TouchableOpacity style={s.backBtn} onPress={() => { directionRef.current = 'back'; setStep(step - 1); }}>
+              <SpinButton style={s.backBtn} spinnerColor={colors.textTertiary} onPress={() => { directionRef.current = 'back'; setStep(step - 1); }}>
                 <Text style={s.backBtnText}>{'‹  Back'}</Text>
-              </TouchableOpacity>
+              </SpinButton>
             )}
 
             {step === 0 && <View />}
 
             {step < STEP_COUNT - 1 ? (
-              <TouchableOpacity style={s.nextBtn} onPress={() => {
+              <SpinButton style={s.nextBtn} onPress={() => {
                 if (step === 2 && !productImageUrl.trim()) {
                   flashProductInputs();
                   return;
@@ -806,18 +839,18 @@ export default function GenerateScreen() {
                 setStep(step + 1);
               }}>
                 <Text style={s.nextBtnText}>{'Next  ›'}</Text>
-              </TouchableOpacity>
+              </SpinButton>
             ) : (
               <View style={s.generateRow}>
-                <TouchableOpacity style={s.generateRowBack} onPress={() => { directionRef.current = 'back'; setStep(step - 1); }}>
+                <SpinButton style={s.generateRowBack} spinnerColor={colors.textTertiary} onPress={() => { directionRef.current = 'back'; setStep(step - 1); }}>
                   <Text style={s.backBtnText}>{'‹  Back'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.previewBtn} onPress={handlePreview} activeOpacity={0.8}>
+                </SpinButton>
+                <SpinButton style={s.previewBtn} spinnerColor={colors.brand} onPress={handlePreview} activeOpacity={0.8}>
                   <Text style={s.previewBtnText}>Preview</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.generateBtn} onPress={handleGenerate} activeOpacity={0.8}>
+                </SpinButton>
+                <SpinButton style={s.generateBtn} onPress={handleGenerate} activeOpacity={0.8}>
                   <Text style={s.generateBtnText}>Generate</Text>
-                </TouchableOpacity>
+                </SpinButton>
               </View>
             )}
           </View>
@@ -880,13 +913,13 @@ export default function GenerateScreen() {
         <View style={s.center}>
           <Text style={s.bigEmoji}>🎬</Text>
           <Text style={s.statusTitle}>Video Ready!</Text>
-          <TouchableOpacity style={s.primaryBtn} onPress={handleOpenVideo} activeOpacity={0.8}>
+          <SpinButton style={s.primaryBtn} onPress={handleOpenVideo} activeOpacity={0.8}>
             <Text style={s.primaryBtnText}>▶ Open Video</Text>
-          </TouchableOpacity>
+          </SpinButton>
           <Text style={s.urlText} numberOfLines={2}>{job.videoUrl}</Text>
-          <TouchableOpacity style={s.secondaryBtn} onPress={handleMakeAnother}>
+          <SpinButton style={s.secondaryBtn} spinnerColor={colors.textTertiary} onPress={handleMakeAnother}>
             <Text style={s.secondaryBtnText}>Make Another</Text>
-          </TouchableOpacity>
+          </SpinButton>
         </View>
       )}
 
@@ -896,9 +929,9 @@ export default function GenerateScreen() {
           <Text style={s.bigEmoji}>⚠️</Text>
           <Text style={s.statusTitle}>Something Went Wrong</Text>
           <Text style={s.errorText}>{job.error}</Text>
-          <TouchableOpacity style={s.secondaryBtn} onPress={handleMakeAnother}>
+          <SpinButton style={s.secondaryBtn} spinnerColor={colors.textTertiary} onPress={handleMakeAnother}>
             <Text style={s.secondaryBtnText}>Make Another</Text>
-          </TouchableOpacity>
+          </SpinButton>
         </View>
       )}
 
